@@ -1,0 +1,13 @@
+node_modules/
+.expo/
+dist/
+.git/
+.env
+.env.*
+!.env.example
+credentials.json
+*.jks
+*.keystore
+*service-account*.json
+.DS_Store
+# google-services.json se incluye SOLO en el build de EAS, nunca en Git.

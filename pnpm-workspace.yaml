@@ -1,0 +1,3 @@
+# Configuración de instalación de esta app; sin paquetes compartidos.
+allowBuilds:
+  unrs-resolver: false
