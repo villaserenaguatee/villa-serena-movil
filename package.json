@@ -31,6 +31,7 @@
     "expo-secure-store": "~15.0.8",
     "expo-status-bar": "~3.0.9",
     "expo-system-ui": "~6.0.9",
+    "expo-web-browser": "~15.0.11",
     "fast-text-encoding": "1.0.6",
     "nativewind": "^4.2.7",
     "openapi-fetch": "^0.14.0",
