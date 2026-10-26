@@ -1,0 +1,2 @@
+# Generado desde docs; check:api compara bytes, así que se conserva LF en cualquier sistema.
+lib/api/schema.d.ts text eol=lf
