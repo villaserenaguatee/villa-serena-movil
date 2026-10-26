@@ -62,6 +62,10 @@ pnpm test:cuenta
 
 La prueba cubre el NIT, el pago con retorno a la app, la espera de acreditación, saldo cero, consentimiento, check-out y PDF con un servidor simulado. La validación del NIT comprueba el dígito, no consulta el registro de contribuyentes.
 
+## Integración continua
+
+Cada PR ejecuta la verificación (contrato, TypeScript, lint y pruebas), Trivy sobre las dependencias y SonarQube. Configuración y secretos en [Integración continua](docs/CI.md).
+
 ## Development build preparado
 
 Los perfiles development y preview generan APK Android. La pantalla de prueba de notificaciones está disponible desde la bienvenida y explica cuándo necesitas el APK. Sigue [APK y notificaciones](docs/APK_Y_NOTIFICACIONES.md) para vincular tus cuentas y ejecutar el build. Antes de hacerlo, usa `node scripts/verificar-build.cjs`.

@@ -1,0 +1,80 @@
+name: Seguridad y calidad
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+  schedule:
+    # Lunes 06:00 en Guatemala: detecta CVE nuevas aunque no haya cambios.
+    - cron: '0 12 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trivy:
+    name: Dependencias (Trivy)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - name: Reporte SARIF para Code scanning
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: sarif
+          output: trivy.sarif
+      - name: Publicar resultados
+        if: always() && github.event.pull_request.head.repo.fork != true
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: trivy.sarif
+          category: trivy
+      - name: Fallar con vulnerabilidades HIGH o CRITICAL corregibles
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: table
+          exit-code: '1'
+          skip-setup-trivy: true
+
+  sonarqube:
+    name: Análisis estático (SonarQube)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+    steps:
+      - name: Comprobar configuración
+        id: config
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "::warning::Falta el secreto SONAR_TOKEN; se omite el análisis. Consulta docs/CI.md."
+            echo "habilitado=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "habilitado=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        if: steps.config.outputs.habilitado == 'true'
+        with:
+          # SonarQube necesita el historial para atribuir los cambios nuevos.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
+        if: steps.config.outputs.habilitado == 'true'
