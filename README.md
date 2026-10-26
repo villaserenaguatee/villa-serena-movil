@@ -21,7 +21,9 @@ Instala Expo Go **SDK 54 para Android** desde [expo.dev/go](https://expo.dev/go?
 ```sh
 pnpm check
 pnpm lint
+pnpm check:api --docs-dir ../villa-serena-docs
 pnpm test:api
+pnpm test:acceso
 pnpm exec expo install --check
 pnpm exec expo export --platform android
 ```
@@ -30,13 +32,11 @@ En el teléfono verifica bienvenida → «Entrar con mi correo» → «En constr
 
 `lib/api` exporta `checkApiHealth()`: consulta `/actuator/health` sin autenticación. Con Spring encendido también puedes abrir `http://<IP-LAN>:8080/actuator/health` desde el teléfono. Debe devolver `{"status":"UP"}`. No se agrega una pantalla de diagnóstico al flujo del huésped.
 
-## Sesión y contrato pendiente
+## Sesión y contrato del API
 
-Los dos tokens se guardan juntos en expo-secure-store. Ante HTTP 401 el cliente realiza una única renovación y reintenta una vez; las peticiones simultáneas comparten la renovación. Si falla, borra la sesión, limpia la caché y vuelve a la bienvenida. No usa AsyncStorage ni registra tokens en consola.
+Los tipos se generan desde el contrato canónico de villa-serena-docs, en el commit fijado por `api-contract.json`; la app no guarda copia de `openapi.yaml`. Sigue [Contrato del API](docs/CONTRATO_API.md) para `pnpm generate:api` y `pnpm check:api`.
 
-**Todavía no hay openapi.yaml ni endpoint de autenticación en el API local.** El adaptador usa provisionalmente `POST /api/v1/auth/renovar`, cuerpo `{ refreshToken }` y respuesta `{ accessToken, refreshToken }`. Hay que ajustar estos campos al contrato aprobado antes de conectar el acceso real. No se presenta esta integración como probada.
-
-Cuando Josué entregue el contrato, copia su `openapi.yaml` aprobado a la raíz y ejecuta `pnpm generate:api`. Están instalados openapi-typescript y openapi-fetch para esa conexión; no se inventa un contrato vacío.
+Los dos tokens se guardan juntos en expo-secure-store. Ante HTTP 401 el cliente realiza una única renovación con `POST /api/v1/auth/renovar` y reintenta una vez; las peticiones simultáneas comparten la renovación. Si falla, borra la sesión, limpia la caché y vuelve a la bienvenida. No usa AsyncStorage ni registra tokens en consola.
 
 ## Siguiente bloque
 
@@ -68,10 +68,12 @@ Los perfiles development y preview generan APK Android. La pantalla de prueba de
 
 Proyecto Android generado localmente. Sigue [Instalación con Android Studio](docs/ANDROID_STUDIO.md) para abrirlo, seleccionar JDK 17 y ejecutar en el Pixel_7 o teléfono USB. Firebase no es necesario para probar las pantallas; sí para el push real.
 
-## Acceso y estadía de demostración
+## Acceso y estadía (HU-HUE-08, HU-HUE-09)
 
-Entrar con mi correo → `ana@example.com` → código `123456` → estadía activa. Puedes revisar el selector de reservas y cerrar la sesión de prueba. El formulario muestra mensajes de código vencido/usado y bloqueo tras cinco intentos. No envía correo, no emite JWT y no sustituye la autenticación del servidor. El detalle de la estadía y la reserva futura usan datos locales. Las pantallas de Room Service y solicitudes usan datos de prueba. Su conexión con las áreas operativas y tiempo real sigue pendiente.
+Entrar con mi correo → código de seis dígitos enviado por correo (con el entorno local llega a Mailpit) → si hay una reserva `EN_ESTADIA` se abre su detalle; si no, el selector de reservas. Los mensajes de código inválido, vencido o bloqueo los define el API. «Cerrar sesión» revoca el refresh en el servidor y borra los tokens aunque no haya red. Requiere Spring con las rutas `/api/v1/app/*` y `EXPO_PUBLIC_API_URL` configurada.
 
-Ejecuta `pnpm test:acceso` para verificar el simulador. La conexión real espera OpenAPI, seguridad y Outbox del equipo.
+Ejecuta `pnpm test:acceso` para probar el cliente con un servidor simulado. La prueba conectada contra Spring y Mailpit se registra aparte.
+
+Cuenta, check-out, Room Service, pedidos y solicitudes siguen con datos de prueba hasta sus issues; la cuenta de prueba de la bienvenida sigue disponible.
 
 El menú permite cantidades y notas, muestra agotados y crea pedidos locales sin sumar cargos hasta su entrega. Las solicitudes permiten pedir limpieza, artículos con máximos y cancelar pendientes. Prueba las reglas con `pnpm test:servicios`. Estos datos no se sincronizan con la web, no se persisten y no generan push.
