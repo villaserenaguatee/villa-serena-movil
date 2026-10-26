@@ -6,8 +6,9 @@ const vm = require('node:vm');
 const ts = require('typescript');
 
 // routes(path, options) devuelve [status, body]; fakes reemplaza módulos por ruta ('lib/sesion') o paquete.
+// state.store simula expo-secure-store; state.pushToken, el token de un APK con permiso (sin él, como Expo Go).
 function setup(routes, fakes = {}) {
-  const state = { session: null, cleared: 0, calls: [] };
+  const state = { session: null, cleared: 0, calls: [], store: new Map(), pushToken: null };
   const clearedListeners = new Set();
   const sesion = {
     readSession: async () => state.session, saveSession: async value => { state.session = value; },
@@ -21,7 +22,9 @@ function setup(routes, fakes = {}) {
     const [status, body] = await routes(route, options);
     return new Response(body === undefined ? null : JSON.stringify(body), { status });
   };
-  const modules = { 'lib/sesion': sesion, ...fakes };
+  const secureStore = { getItemAsync: async key => state.store.get(key) ?? null, setItemAsync: async (key, value) => { state.store.set(key, value); }, deleteItemAsync: async key => { state.store.delete(key); } };
+  const notificaciones = { obtenerTokenPush: async () => { if (!state.pushToken) throw new Error('Expo Go no admite push.'); return state.pushToken; } };
+  const modules = { 'lib/sesion': sesion, 'expo-secure-store': secureStore, 'lib/notificaciones': notificaciones, ...fakes };
   function load(file) {
     if (modules[file]) return modules[file];
     const exports = modules[file] = {};

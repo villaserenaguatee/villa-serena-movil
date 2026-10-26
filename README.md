@@ -66,6 +66,8 @@ La prueba cubre el NIT, el pago con retorno a la app, la espera de acreditación
 
 Los perfiles development y preview generan APK Android. La pantalla de prueba de notificaciones está disponible desde la bienvenida y explica cuándo necesitas el APK. Sigue [APK y notificaciones](docs/APK_Y_NOTIFICACIONES.md) para vincular tus cuentas y ejecutar el build. Antes de hacerlo, usa `node scripts/verificar-build.cjs`.
 
+Con sesión iniciada, el APK registra su token push en el API y lo da de baja al cerrar sesión; al tocar un aviso se abre el pedido o la solicitud de la reserva. Detalles en la sección 5 de esa guía.
+
 ## Android Studio
 
 Proyecto Android generado localmente. Sigue [Instalación con Android Studio](docs/ANDROID_STUDIO.md) para abrirlo, seleccionar JDK 17 y ejecutar en el Pixel_7 o teléfono USB. Firebase no es necesario para probar las pantallas; sí para el push real.

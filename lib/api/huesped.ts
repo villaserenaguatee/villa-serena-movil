@@ -1,5 +1,6 @@
 import { clearSession, onSessionCleared, readSession, saveSession, tokensSchema } from '../sesion';
 import { ApiError, apiJson, type Schemas } from './index';
+import { darDeBajaDispositivo } from './push';
 
 // HU-HUE-08 y HU-HUE-09: acceso con código por correo y reservas del huésped.
 export type ReservaResumen = Schemas['ReservaAppResumen'];
@@ -20,8 +21,9 @@ export async function verificarCodigo(correo: string, codigo: string) {
   await saveSession(tokensSchema.parse(await apiJson<Schemas['Tokens']>('/api/v1/app/acceso/verificar-codigo', { method: 'POST', body }, false)));
 }
 
-// Revoca el refresh en el servidor; los tokens locales se borran aunque falle la red.
+// Da de baja el push y revoca el refresh en el servidor; los tokens locales se borran aunque falle la red.
 export async function cerrarSesion() {
+  await darDeBajaDispositivo().catch(() => undefined);
   try {
     const session = await readSession();
     if (session) {

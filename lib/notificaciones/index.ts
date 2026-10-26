@@ -1,7 +1,8 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 
-export async function requestTestPushToken(): Promise<string> {
+// Pide permiso si hace falta y devuelve el Expo push token; falla en Expo Go, web o sin proyecto EAS.
+export async function obtenerTokenPush(): Promise<string> {
   if (Platform.OS !== 'android') throw new Error('Esta prueba se realiza en la app Android instalada.');
   if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
     throw new Error('Expo Go no admite esta prueba. Instala el APK de desarrollo generado con EAS.');
@@ -26,13 +27,17 @@ export async function requestTestPushToken(): Promise<string> {
   return (await Notifications.getExpoPushTokenAsync({ projectId })).data;
 }
 
-// Solo rutas internas conocidas; confirmar la clave `pantalla` con contrato parte 2.
-export function notificationRoute(data: Record<string, unknown>): '/pedidos' | '/solicitudes' | null {
-  if (data.pantalla === 'pedidos') return '/pedidos';
-  if (data.pantalla === 'solicitudes') return '/solicitudes';
-  return null;
+export const requestTestPushToken = obtenerTokenPush;
+
+export type NotificationRoute = { pathname: '/pedidos' | '/solicitudes'; params: { codigo?: string } };
+// x-push: `pantalla` elige una ruta interna conocida y `codigoReserva` la reserva; no se abren otras URL.
+export function notificationRoute(data: Record<string, unknown>): NotificationRoute | null {
+  const pathname = data.pantalla === 'pedidos' ? '/pedidos' : data.pantalla === 'solicitudes' ? '/solicitudes' : null;
+  if (!pathname) return null;
+  const codigo = typeof data.codigoReserva === 'string' && /^VS-[A-Z0-9]{6}$/.test(data.codigoReserva) ? data.codigoReserva : undefined;
+  return { pathname, params: codigo ? { codigo } : {} };
 }
-export async function listenNotificationResponses(open: (path: '/pedidos' | '/solicitudes') => void): Promise<() => void> {
+export async function listenNotificationResponses(open: (route: NotificationRoute) => void): Promise<() => void> {
   if (Platform.OS !== 'android' || Constants.executionEnvironment === ExecutionEnvironment.StoreClient) return () => {};
   const Notifications = await import('expo-notifications');
   let disposed = false;
@@ -40,8 +45,8 @@ export async function listenNotificationResponses(open: (path: '/pedidos' | '/so
   const handle = (response: import('expo-notifications').NotificationResponse) => {
     const id = response.notification.request.identifier;
     if (disposed || handled.has(id)) return;
-    const path = notificationRoute(response.notification.request.content.data);
-    if (path) { handled.add(id); open(path); }
+    const route = notificationRoute(response.notification.request.content.data);
+    if (route) { handled.add(id); open(route); }
   };
   const subscription = Notifications.addNotificationResponseReceivedListener(handle);
   try {
