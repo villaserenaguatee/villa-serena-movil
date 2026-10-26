@@ -1,7 +1,6 @@
 import { useSyncExternalStore } from 'react';
-import { openDemoSession } from '../lib/mocks/estadia';
 import { isSessionActive, subscribeSession } from '../lib/sesion';
-import { Link, router } from 'expo-router';
+import { Link } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 export default function Welcome() {
@@ -21,9 +20,6 @@ export default function Welcome() {
             <Text className="text-center text-base font-semibold text-white">{session ? 'Ver mis reservas' : 'Entrar con mi correo'}</Text>
           </Pressable>
         </Link>
-          <Pressable onPress={() => { openDemoSession(); router.push('/cuenta'); }} accessibilityRole="button" className="mt-3 rounded-2xl border border-navy px-6 py-4">
-            <Text className="text-center text-sm font-semibold text-navy">Ver cuenta de prueba</Text>
-          </Pressable>
         <Link href="/prueba-notificaciones" asChild>
           <Pressable accessibilityRole="button" className="mt-3 py-3">
             <Text className="text-center text-sm text-muted">Probar notificaciones · Desarrollo</Text>

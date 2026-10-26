@@ -1,5 +1,5 @@
-import { clearSession, readSession, saveSession, tokensSchema } from '../sesion';
-import { apiJson, type Schemas } from './index';
+import { clearSession, onSessionCleared, readSession, saveSession, tokensSchema } from '../sesion';
+import { ApiError, apiJson, type Schemas } from './index';
 
 // HU-HUE-08 y HU-HUE-09: acceso con código por correo y reservas del huésped.
 export type ReservaResumen = Schemas['ReservaAppResumen'];
@@ -34,7 +34,20 @@ export async function cerrarSesion() {
 
 export function listarReservas() { return apiJson<ReservaResumen[]>('/api/v1/app/reservas'); }
 
-export function detalleReserva(codigo: string) { return apiJson<ReservaDetalle>(`/api/v1/app/reservas/${encodeURIComponent(codigo)}`); }
+export function detalleReserva(codigo: string) { return apiJson<ReservaDetalle>(rutaReserva(codigo)); }
+
+export function rutaReserva(codigo: string, subruta = '') { return `/api/v1/app/reservas/${encodeURIComponent(codigo)}${subruta}`; }
+
+// Reserva abierta por última vez; permite llegar a cuenta, pedidos o solicitudes desde una notificación.
+let reservaRecordada: string | null = null;
+onSessionCleared(() => { reservaRecordada = null; });
+export async function reservaActual(codigo?: string) {
+  if (codigo) return reservaRecordada = codigo;
+  if (reservaRecordada) return reservaRecordada;
+  const activa = (await listarReservas()).find(reserva => reserva.estado === 'EN_ESTADIA');
+  if (!activa) throw new ApiError(404, 'SIN_ESTADIA', 'No tienes una estadía activa. Elige una reserva en «Mis reservas».');
+  return reservaRecordada = activa.codigo;
+}
 
 // Con una reserva EN_ESTADIA se entra directo a su detalle; si no, al selector.
 export function destinoTrasAcceso(reservas: ReservaResumen[]) {
