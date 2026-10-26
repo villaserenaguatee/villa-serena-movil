@@ -1,18 +1,33 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
-import { Action, dateLabel, money, Notice } from '../components/cuenta';
-import { getOrders } from '../lib/mocks/servicios';
-const labels = { NUEVO: 'Nuevo', EN_PREPARACION: 'En preparación', EN_CAMINO: 'En camino', ENTREGADO: 'Entregado', CANCELADO: 'Cancelado' };
+import { Action, dateLabel, money, Notice, useCarga } from '../components/cuenta';
+import { reservaActual } from '../lib/api/huesped';
+import { aplicarPedido, estadoPedidoLabel, listarPedidos } from '../lib/api/pedidos';
+import { suscribirPedidos } from '../lib/tiempo-real';
 export default function Orders() {
-  const [orders, setOrders] = useState<Awaited<ReturnType<typeof getOrders>>>([]); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
-  const reload = useCallback(async () => { setBusy(true); try { setOrders(await getOrders()); setError(''); } catch { setError('No pudimos cargar los pedidos.'); } finally { setBusy(false); } }, []);
-  useFocusEffect(useCallback(() => { void reload(); }, [reload]));
-  return <SafeAreaView edges={['bottom']} className="flex-1 bg-cream"><ScrollView className="flex-1 bg-cream" contentContainerStyle={{ padding: 24 }} refreshControl={<RefreshControl refreshing={busy} onRefresh={reload} />}>
-    <Notice text="Pedidos de prueba. El seguimiento en vivo y los avisos esperan el WebSocket y el API del equipo." />
-    <Text accessibilityRole="header" className="mb-6 text-3xl text-navy">Mis pedidos</Text>
+  const { codigo: param } = useLocalSearchParams<{ codigo?: string }>();
+  const { data: orders, setData, refreshing, error, reload } = useCarga(useCallback(async () => listarPedidos(await reservaActual(param)), [param]));
+  const [live, setLive] = useState(false);
+  // HU-HUE-11: estados en vivo mientras la pantalla está abierta; sin cancelar ni modificar desde la app.
+  useFocusEffect(useCallback(() => suscribirPedidos({
+    recargar: reload,
+    alActualizar: pedido => setData(actuales => aplicarPedido(actuales ?? [], pedido)),
+    alCambiarConexion: setLive,
+  }), [reload, setData]));
+  return <SafeAreaView edges={['bottom']} className="flex-1 bg-cream"><ScrollView className="flex-1 bg-cream" contentContainerStyle={{ padding: 24 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} />}>
+    <Text accessibilityRole="header" className="text-3xl text-navy">Mis pedidos</Text>
+    <Text className="mb-6 mt-2 text-xs text-muted">{live ? 'Actualización en vivo' : 'Conectando para actualizar en vivo…'}</Text>
     {error ? <><Notice text={error} /><Action label="Reintentar" onPress={reload} /></> : null}
-    {orders.map(order => <View key={order.id} className="mb-4 gap-3 rounded-2xl bg-white p-5"><Text className="text-lg font-semibold text-navy">{labels[order.status]}</Text><Text className="text-muted">{dateLabel(order.date)}</Text><Text className="text-base text-navy">{order.description}</Text>{order.notes ? <Text className="text-muted">Notas: {order.notes}</Text> : null}<Text className="font-semibold text-navy">{money(order.cents / 100)}</Text>{order.status === 'CANCELADO' ? <Text className="text-sm text-muted">Cancelado al finalizar la estadía.</Text> : null}</View>)}
+    {orders && !orders.length ? <Text className="text-muted">Todavía no tienes pedidos.</Text> : null}
+    {orders?.map(order => <View key={order.id} className="mb-4 gap-3 rounded-2xl bg-white p-5">
+      <Text className="text-lg font-semibold text-navy">{estadoPedidoLabel[order.estado]}</Text>
+      <Text className="text-muted">{dateLabel(order.creadoEn)}</Text>
+      <Text className="text-base text-navy">{order.items.map(item => `${item.nombre} × ${item.cantidad}`).join(', ')}</Text>
+      {order.notas ? <Text className="text-muted">Notas: {order.notas}</Text> : null}
+      <Text className="font-semibold text-navy">{money(order.total)}</Text>
+      {order.estado === 'CANCELADO' ? <Text className="text-sm text-muted">Cancelado{order.motivoCancelacion ? `: ${order.motivoCancelacion}` : '.'}</Text> : null}
+    </View>)}
   </ScrollView></SafeAreaView>;
 }

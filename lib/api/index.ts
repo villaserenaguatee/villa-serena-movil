@@ -4,7 +4,7 @@ import type { components } from './schema';
 export type Schemas = components['schemas'];
 // Error del contrato (`Error`): código estable y mensaje en español para mostrar.
 export class ApiError extends Error {
-  constructor(readonly status: number, readonly codigo: string, message: string) { super(message); }
+  constructor(readonly status: number, readonly codigo: string, message: string, readonly detalles: Schemas['DetalleError'][] = []) { super(message); }
 }
 
 function baseUrl() {
@@ -63,7 +63,7 @@ export async function apiJson<T>(path: string, options: { method?: string; body?
   }
   if (!response.ok) {
     const body = await response.json().catch(() => null) as Partial<Schemas['Error']> | null;
-    throw new ApiError(response.status, body?.codigo ?? `HTTP_${response.status}`, body?.mensaje ?? 'Ocurrió un error. Intenta de nuevo.');
+    throw new ApiError(response.status, body?.codigo ?? `HTTP_${response.status}`, body?.mensaje ?? 'Ocurrió un error. Intenta de nuevo.', body?.detalles ?? []);
   }
   return (response.status === 204 ? undefined : await response.json()) as T;
 }

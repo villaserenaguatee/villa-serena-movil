@@ -74,9 +74,13 @@ Entrar con mi correo → código de seis dígitos enviado por correo (con el ent
 
 Ejecuta `pnpm test:acceso` para probar el cliente con un servidor simulado. La prueba conectada contra Spring y Mailpit se registra aparte.
 
-Check-out, Room Service y pedidos siguen con datos de prueba hasta sus issues.
+El check-out sigue con datos de prueba hasta su issue.
 
-El menú de Room Service todavía usa datos locales: permite cantidades y notas, muestra agotados y crea pedidos locales sin sumar cargos hasta su entrega.
+## Room Service y pedidos (HU-HUE-10, HU-HUE-11)
+
+Durante la estadía el menú (`GET .../menu`) se agrupa por categoría con precio en quetzales; los productos `AGOTADO` se muestran sin permitir agregarlos. El carrito envía solo ítems y cantidades, con notas opcionales para el pedido (el contrato define notas por pedido, no por ítem); el servidor calcula precios y total, y el cargo llega a la cuenta al entregarse. Si un producto se agotó, el API responde 409 con los ítems afectados y el menú se recarga.
+
+«Mis pedidos» se suscribe por STOMP a `/user/queue/pedidos` en `ws(s)://<API>/ws` con el JWT del huésped mientras la pantalla está abierta. Cada evento `PEDIDO_ACTUALIZADO` reemplaza el pedido en la lista; al conectar o reconectar se recarga con `GET .../pedidos`. Un pedido cancelado muestra el motivo de Room Service. La app no cancela ni modifica pedidos.
 
 ## Limpieza y artículos (HU-HUE-12 a HU-HUE-14)
 
