@@ -74,6 +74,10 @@ Entrar con mi correo → código de seis dígitos enviado por correo (con el ent
 
 Ejecuta `pnpm test:acceso` para probar el cliente con un servidor simulado. La prueba conectada contra Spring y Mailpit se registra aparte.
 
-Check-out, Room Service, pedidos y solicitudes siguen con datos de prueba hasta sus issues.
+Check-out, Room Service y pedidos siguen con datos de prueba hasta sus issues.
 
-El menú permite cantidades y notas, muestra agotados y crea pedidos locales sin sumar cargos hasta su entrega. Las solicitudes permiten pedir limpieza, artículos con máximos y cancelar pendientes. Prueba las reglas con `pnpm test:servicios`. Estos datos no se sincronizan con la web, no se persisten y no generan push.
+El menú de Room Service todavía usa datos locales: permite cantidades y notas, muestra agotados y crea pedidos locales sin sumar cargos hasta su entrega.
+
+## Limpieza y artículos (HU-HUE-12 a HU-HUE-14)
+
+Durante la estadía (`EN_ESTADIA`) el huésped pide limpieza con comentario opcional o artículos del catálogo `GET .../articulos`, sin superar `cantidadMaxima`. Si ya hay una limpieza pendiente o en proceso, se muestra el aviso del API (409). La lista de solicitudes se recarga al abrir la pantalla y al deslizar; solo las `PENDIENTE` pueden cancelarse. Fuera de la estadía solo se consulta el historial. Prueba el cliente con `pnpm test:servicios`.
