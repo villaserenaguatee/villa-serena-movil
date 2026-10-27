@@ -3,17 +3,20 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { onSessionCleared } from '../lib/sesion';
-import { closeDemoSession, isDemoSession, subscribeDemoSession } from '../lib/mocks/estadia';
+import { isSessionActive, onSessionCleared, readSession, subscribeSession } from '../lib/sesion';
 import { listenNotificationResponses } from '../lib/notificaciones';
+import { registrarDispositivo } from '../lib/api/push';
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 export default function RootLayout() {
-  const signedIn = useSyncExternalStore(subscribeDemoSession, isDemoSession, () => false);
-  useEffect(() => onSessionCleared(() => { queryClient.clear(); closeDemoSession(); router.replace('/'); }), []);
+  const signedIn = useSyncExternalStore(subscribeSession, isSessionActive, () => false);
+  useEffect(() => { void readSession().catch(() => { /* Sin sesión guardada legible. */ }); }, []);
+  // Con sesión se registra el token push; un rechazo de permiso o un error no bloquea la app.
+  useEffect(() => { if (signedIn) void registrarDispositivo().catch(() => undefined); }, [signedIn]);
+  useEffect(() => onSessionCleared(() => { queryClient.clear(); router.replace('/'); }), []);
   useEffect(() => {
     let disposed = false;
     let remove: (() => void) | undefined;
-    void listenNotificationResponses(path => { if (isDemoSession()) router.push(path); }).then(cleanup => {
+    void listenNotificationResponses(route => { void readSession().then(tokens => { if (tokens) router.push(route); }); }).then(cleanup => {
       if (disposed) cleanup(); else remove = cleanup;
     }).catch(() => { /* La aplicación sigue disponible sin notificaciones. */ });
     return () => { disposed = true; remove?.(); };

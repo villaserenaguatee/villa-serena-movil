@@ -1,28 +1,41 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
-import { Action, dateLabel, Notice } from '../components/cuenta';
-import { articles, cancelRequest, DemoRequest, getRequests, requestArticles, requestCleaning } from '../lib/mocks/servicios';
-import { getAccount } from '../lib/mocks/cuenta';
-const labels = { PENDIENTE: 'Pendiente', EN_PROCESO: 'En proceso', ATENDIDA: 'Atendida', CANCELADA: 'Cancelada' };
+import { Action, dateLabel, Notice, useCarga } from '../components/cuenta';
+import { detalleReserva, reservaActual } from '../lib/api/huesped';
+import { cancelarSolicitud, describirSolicitud, estadoSolicitudLabel, listarArticulos, listarSolicitudes, solicitarArticulos, solicitarLimpieza } from '../lib/api/solicitudes';
 export default function Requests() {
-  const [requests, setRequests] = useState<DemoRequest[]>([]); const [comment, setComment] = useState(''); const [counts, setCounts] = useState<Record<string, number>>({}); const [busy, setBusy] = useState(false); const [active, setActive] = useState(false); const [error, setError] = useState('');
-  const reload = useCallback(async () => { setBusy(true); try { setRequests(await getRequests()); setActive((await getAccount()).reservation === 'EN_ESTADIA'); setError(''); } catch { setError('No pudimos cargar las solicitudes.'); } finally { setBusy(false); } }, []);
-  useFocusEffect(useCallback(() => { void reload(); }, [reload]));
-  async function run(action: () => Promise<void>) { if (busy) return; setBusy(true); setError(''); try { await action(); setRequests(await getRequests()); setActive((await getAccount()).reservation === 'EN_ESTADIA'); } catch (cause) { setError((cause as Error).message); } finally { setBusy(false); } }
-  return <SafeAreaView edges={['bottom']} className="flex-1 bg-cream"><ScrollView className="flex-1 bg-cream" keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24 }} refreshControl={<RefreshControl refreshing={busy} onRefresh={reload} />}>
-    <Notice text="Solicitudes de demostración · No se envían al personal de Limpieza" />
+  const { codigo: param } = useLocalSearchParams<{ codigo?: string }>();
+  const { data, refreshing, error: loadError, reload } = useCarga(useCallback(async () => {
+    const codigo = await reservaActual(param);
+    const [reserva, solicitudes] = await Promise.all([detalleReserva(codigo), listarSolicitudes(codigo)]);
+    const active = reserva.estado === 'EN_ESTADIA';
+    return { codigo, active, solicitudes, articulos: active ? await listarArticulos(codigo) : [] };
+  }, [param]));
+  const [comment, setComment] = useState('');
+  const [counts, setCounts] = useState<Record<number, number>>({});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  async function run(action: (codigo: string) => Promise<void>, done: string) {
+    if (busy || !data) return;
+    setBusy(true); setError(''); setMessage('');
+    try { await action(data.codigo); setMessage(done); } catch (cause) { setError((cause as Error).message); } finally { setBusy(false); await reload(); }
+  }
+  return <SafeAreaView edges={['bottom']} className="flex-1 bg-cream"><ScrollView className="flex-1 bg-cream" keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} />}>
     <Text accessibilityRole="header" className="mb-6 text-3xl text-navy">Limpieza y artículos</Text>
+    {loadError ? <Notice text={loadError} /> : null}
     {error ? <Notice text={error} /> : null}
-    {active ? <>
-      <View className="mb-6 gap-3 rounded-2xl bg-white p-5"><Text className="text-xl text-navy">Solicitar limpieza</Text><TextInput accessibilityLabel="Comentario de limpieza" value={comment} onChangeText={setComment} multiline placeholder="Comentario (opcional)" className="rounded-xl border border-muted/30 p-4 text-navy" /><Action label="Pedir limpieza" disabled={busy} onPress={() => run(async () => { await requestCleaning(comment); setComment(''); })} /></View>
+    {message ? <Notice text={message} /> : null}
+    {data?.active ? <>
+      <View className="mb-6 gap-3 rounded-2xl bg-white p-5"><Text className="text-xl text-navy">Solicitar limpieza</Text><TextInput accessibilityLabel="Comentario de limpieza" value={comment} onChangeText={setComment} maxLength={500} multiline placeholder="Comentario (opcional), por ejemplo: después de las 2:00 p. m." className="rounded-xl border border-muted/30 p-4 text-navy" /><Action label="Pedir limpieza" disabled={busy} onPress={() => run(async codigo => { await solicitarLimpieza(codigo, comment); setComment(''); }, 'Solicitud de limpieza enviada.')} /></View>
       <Text className="mb-3 text-xl text-navy">Artículos para tu habitación</Text>
-      {articles.map(item => <View key={item.id} className="mb-3 gap-3 rounded-2xl bg-white p-5"><Text className="text-lg text-navy">{item.name} · Máximo {item.max}</Text><View className="flex-row items-center gap-3"><View className="flex-1"><Action label="−" accessibilityLabel={`Quitar ${item.name}`} secondary disabled={!counts[item.id] || busy} onPress={() => setCounts({ ...counts, [item.id]: Math.max(0, (counts[item.id] ?? 0) - 1) })} /></View><Text className="text-navy">{counts[item.id] ?? 0}</Text><View className="flex-1"><Action label="+" accessibilityLabel={`Agregar ${item.name}`} secondary disabled={counts[item.id] >= item.max || busy} onPress={() => setCounts({ ...counts, [item.id]: (counts[item.id] ?? 0) + 1 })} /></View></View></View>)}
-      <Action label="Pedir artículos" disabled={busy || !Object.values(counts).some(count => count > 0)} onPress={() => run(async () => { await requestArticles(counts); setCounts({}); })} />
-    </> : <Notice text="Estos servicios están disponibles solo durante la estadía." />}
+      {data.articulos.map(item => <View key={item.id} className="mb-3 gap-3 rounded-2xl bg-white p-5"><Text className="text-lg text-navy">{item.nombre} · Máximo {item.cantidadMaxima}</Text><View className="flex-row items-center gap-3"><View className="flex-1"><Action label="−" accessibilityLabel={`Quitar ${item.nombre}`} secondary disabled={!counts[item.id] || busy} onPress={() => setCounts({ ...counts, [item.id]: Math.max(0, (counts[item.id] ?? 0) - 1) })} /></View><Text className="text-navy">{counts[item.id] ?? 0}</Text><View className="flex-1"><Action label="+" accessibilityLabel={`Agregar ${item.nombre}`} secondary disabled={(counts[item.id] ?? 0) >= item.cantidadMaxima || busy} onPress={() => setCounts({ ...counts, [item.id]: (counts[item.id] ?? 0) + 1 })} /></View></View></View>)}
+      <Action label="Pedir artículos" disabled={busy || !Object.values(counts).some(count => count > 0)} onPress={() => run(async codigo => { await solicitarArticulos(codigo, counts); setCounts({}); }, 'Solicitud de artículos enviada.')} />
+    </> : data ? <Notice text="Estos servicios están disponibles solo durante la estadía." /> : null}
     <Text accessibilityRole="header" className="my-6 text-xl text-navy">Mis solicitudes</Text>
-    {!requests.length ? <Text className="text-muted">Todavía no tienes solicitudes.</Text> : null}
-    {requests.map(request => <View key={request.id} className="mb-4 gap-3 rounded-2xl bg-white p-5"><Text className="font-semibold text-navy">{request.type === 'LIMPIEZA' ? 'Limpieza' : 'Artículos'} · {labels[request.status]}</Text><Text className="text-muted">{dateLabel(request.date)}</Text><Text className="text-navy">{request.description}</Text>{request.comment ? <Text className="text-muted">{request.comment}</Text> : null}{request.status === 'PENDIENTE' ? <Action label="Cancelar solicitud" secondary disabled={busy} onPress={() => run(() => cancelRequest(request.id))} /> : <Text className="text-xs text-muted">Solo se pueden cancelar solicitudes pendientes.</Text>}</View>)}
+    {data && !data.solicitudes.length ? <Text className="text-muted">Todavía no tienes solicitudes.</Text> : null}
+    {data?.solicitudes.map(request => <View key={request.id} className="mb-4 gap-3 rounded-2xl bg-white p-5"><Text className="font-semibold text-navy">{request.tipo === 'LIMPIEZA' ? 'Limpieza' : 'Artículos'} · {estadoSolicitudLabel[request.estado]}</Text><Text className="text-muted">{dateLabel(request.creadaEn)}</Text><Text className="text-navy">{describirSolicitud(request)}</Text>{request.comentario ? <Text className="text-muted">{request.comentario}</Text> : null}{request.estado === 'PENDIENTE' ? <Action label="Cancelar solicitud" secondary disabled={busy} onPress={() => run(codigo => cancelarSolicitud(codigo, request.id).then(() => undefined), 'Solicitud cancelada.')} /> : request.estado === 'EN_PROCESO' ? <Text className="text-xs text-muted">El personal ya está atendiendo esta solicitud; no se puede cancelar.</Text> : null}</View>)}
   </ScrollView></SafeAreaView>;
 }

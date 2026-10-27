@@ -26,7 +26,7 @@ export default function PushTestScreen() {
       <Text className="my-6 text-base leading-7 text-muted">Prueba en Android con el APK de desarrollo. Al continuar, la app solicitará permiso para recibir notificaciones.</Text>
       {message ? <Notice text={message} /> : null}
       <Action label={busy ? 'Comprobando…' : 'Probar permiso y token push'} onPress={test} disabled={busy} />
-      <Text className="mt-5 text-sm leading-6 text-muted">El token se muestra únicamente en la consola local. Esta prueba no envía notificaciones ni lo registra con el backend.</Text>
+      <Text className="mt-5 text-sm leading-6 text-muted">El token se muestra únicamente en la consola local. Esta prueba no envía notificaciones; con sesión iniciada, la app lo registra en el backend automáticamente.</Text>
     </ScrollView>
   </SafeAreaView>;
 }

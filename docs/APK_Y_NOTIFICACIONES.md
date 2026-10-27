@@ -52,6 +52,12 @@ Para un APK sin development client usa el perfil `preview`:
 npx eas-cli@latest build --profile preview --platform android
 ```
 
-## Pendiente del objetivo 3A
+## 5. Registro con el API (HU-HUE-17)
 
-Registrar y revocar el token con el API del huésped; enviar push mediante el Outbox de Hugo; abrir el pedido o solicitud al tocar el aviso. No se implementan en este bloque. Marca el avance del documento 17 después de probar los criterios y fusionar el PR.
+Con sesión iniciada en el APK, la app pide permiso de notificaciones y registra el token con `POST /api/v1/app/dispositivos-push`; guarda en SecureStore solo el `id` devuelto. Si el huésped rechaza el permiso, o si la app corre en Expo Go o en web, no se registra nada y la app sigue funcionando.
+
+Al cerrar sesión la app llama `DELETE /api/v1/app/dispositivos-push/{id}` y después `POST /api/v1/app/cerrar-sesion`, que también borra los tokens del huésped. Tras el check-out el servidor ya los eliminó y la app solo olvida el `id` local.
+
+El API envía push solo con la reserva `EN_ESTADIA`, por pedido `ENTREGADO` y solicitud `ATENDIDA`, sin datos personales ni montos (`x-push` del contrato). Al tocarla, `data.pantalla` abre «Mis pedidos» o «Mis solicitudes» y `data.codigoReserva` elige la reserva; cualquier otro valor se ignora.
+
+Pendiente de comprobar con el teléfono y el API conectados: vincular el proyecto EAS (`extra.eas.projectId`), las credenciales FCM v1 del proyecto Firebase del equipo, la llegada de los avisos y la navegación al tocarlos.

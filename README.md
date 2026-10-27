@@ -21,7 +21,9 @@ Instala Expo Go **SDK 54 para Android** desde [expo.dev/go](https://expo.dev/go?
 ```sh
 pnpm check
 pnpm lint
+pnpm check:api --docs-dir ../villa-serena-docs
 pnpm test:api
+pnpm test:acceso
 pnpm exec expo install --check
 pnpm exec expo export --platform android
 ```
@@ -30,13 +32,11 @@ En el teléfono verifica bienvenida → «Entrar con mi correo» → «En constr
 
 `lib/api` exporta `checkApiHealth()`: consulta `/actuator/health` sin autenticación. Con Spring encendido también puedes abrir `http://<IP-LAN>:8080/actuator/health` desde el teléfono. Debe devolver `{"status":"UP"}`. No se agrega una pantalla de diagnóstico al flujo del huésped.
 
-## Sesión y contrato pendiente
+## Sesión y contrato del API
 
-Los dos tokens se guardan juntos en expo-secure-store. Ante HTTP 401 el cliente realiza una única renovación y reintenta una vez; las peticiones simultáneas comparten la renovación. Si falla, borra la sesión, limpia la caché y vuelve a la bienvenida. No usa AsyncStorage ni registra tokens en consola.
+Los tipos se generan desde el contrato canónico de villa-serena-docs, en el commit fijado por `api-contract.json`; la app no guarda copia de `openapi.yaml`. Sigue [Contrato del API](docs/CONTRATO_API.md) para `pnpm generate:api` y `pnpm check:api`.
 
-**Todavía no hay openapi.yaml ni endpoint de autenticación en el API local.** El adaptador usa provisionalmente `POST /api/v1/auth/renovar`, cuerpo `{ refreshToken }` y respuesta `{ accessToken, refreshToken }`. Hay que ajustar estos campos al contrato aprobado antes de conectar el acceso real. No se presenta esta integración como probada.
-
-Cuando Josué entregue el contrato, copia su `openapi.yaml` aprobado a la raíz y ejecuta `pnpm generate:api`. Están instalados openapi-typescript y openapi-fetch para esa conexión; no se inventa un contrato vacío.
+Los dos tokens se guardan juntos en expo-secure-store. Ante HTTP 401 el cliente realiza una única renovación con `POST /api/v1/auth/renovar` y reintenta una vez; las peticiones simultáneas comparten la renovación. Si falla, borra la sesión, limpia la caché y vuelve a la bienvenida. No usa AsyncStorage ni registra tokens en consola.
 
 ## Siguiente bloque
 
@@ -44,34 +44,46 @@ OBJ-0F parte 2: expo-dev-client, expo-notifications, Firebase y EAS. Push requie
 
 La única variable pública es EXPO_PUBLIC_API_URL. No colocar secretos en EXPO_PUBLIC_*. `.env` y credenciales Firebase están ignorados. No marcar el avance como terminado hasta verificar los criterios del prompt y fusionar el PR.
 
-## OBJ-4D — Cuenta y check-out de prueba
+## Cuenta (HU-HUE-15)
 
-Desde la bienvenida toca **Ver cuenta de prueba**. También puedes ejecutar `pnpm web` y abrir `/cuenta`. Son pantallas de la app móvil; no se agregaron a `villa-serena-web`.
+Desde la estadía, «Mi cuenta» consulta `GET /api/v1/app/reservas/{codigo}/cuenta` en cualquier estado de la reserva. Muestra cargos con fecha y monto en quetzales (IVA incluido), los anulados tachados con su motivo, los pagos con método y estado, y el saldo que calcula el servidor: cargos vigentes menos pagos aprobados. Es de solo lectura; se recarga al volver a la pantalla o al deslizar hacia abajo. Una reserva ajena muestra el error del API.
 
-El ejemplo muestra Q 1,925.00 de cargos vigentes y Q 1,800.00 de pagos aprobados: saldo Q 125.00. El cargo anulado y el pago fallido no suman. La cuenta se recarga al volver a la pantalla o deslizar hacia abajo en Android.
+## Pago del saldo, check-out y factura (HU-HUE-16)
 
-Recorrido: cuenta → check-out → aceptar cancelación del pedido en preparación → pagar saldo (simulación) → simular confirmación → Consumidor Final o NIT válido → confirmar → resumen de factura. La hora simulada es el 8 de octubre de 2026 a las 10:00 de Guatemala. Todos los datos y operaciones simuladas están en `lib/mocks/cuenta.ts`; se reinician al recargar la app. Para inspeccionar los bloqueos cambia la fecha de salida, DEMO_NOW o el pedido a EN_CAMINO en ese archivo.
+«Continuar al check-out» consulta `GET .../checkout`: el servidor informa saldo, bloqueos (fuera de la ventana de 00:00 a 12:00 del día de salida en Guatemala, pedido `EN_CAMINO`) y pedidos `NUEVO` o `EN_PREPARACION` que se cancelarán sin cargo; para confirmar se pide aceptar esa cancelación.
+
+Con saldo positivo, la acción de `GET .../pago-saldo/estado` decide el botón: iniciar o reintentar (`POST .../pago-saldo`), continuar un pago abierto o esperar la verificación. La pasarela de Recurrente (GTQ) se abre con `expo-web-browser` y vuelve a `villaserena://checkout`; el regreso no acredita el pago, la app consulta el estado hasta que el servidor lo confirme. El API debe configurar `APP_URL_RETORNO` con esa URL (en Expo Go, `Linking.createURL('checkout')` produce una URL `exp://`).
+
+Con saldo Q 0.00 se elige «Consumidor Final» o un NIT validado con su dígito verificador (admite K) y se confirma con `POST .../checkout`. La factura muestra serie, número, receptor, cargos y total, y abre el PDF con el enlace temporal de `GET /api/v1/facturas/{id}/pdf`. Tras finalizar, Room Service y solicitudes quedan deshabilitados por el estado de la reserva.
 
 ```sh
 pnpm test:cuenta
 ```
 
-La prueba cubre límites de horario, pedidos, NIT (incluido K), exclusión de cargos anulados y pagos no aprobados, pago pendiente y reintento sin doble cobro. La validación del NIT comprueba el dígito, no consulta el registro de contribuyentes.
-
-**Pendiente de integración:** Stripe Checkout con `expo-web-browser`, retorno villaserena://, consulta del saldo tras webhook, autorización del huésped, check-out transaccional y URL del PDF/correo. El botón de PDF está deshabilitado en los datos de prueba porque aún no existe una factura del servidor. No se han marcado estas tareas como completadas en el documento 17.
+La prueba cubre el NIT, el pago con retorno a la app, la espera de acreditación, saldo cero, consentimiento, check-out y PDF con un servidor simulado. La validación del NIT comprueba el dígito, no consulta el registro de contribuyentes.
 
 ## Development build preparado
 
 Los perfiles development y preview generan APK Android. La pantalla de prueba de notificaciones está disponible desde la bienvenida y explica cuándo necesitas el APK. Sigue [APK y notificaciones](docs/APK_Y_NOTIFICACIONES.md) para vincular tus cuentas y ejecutar el build. Antes de hacerlo, usa `node scripts/verificar-build.cjs`.
 
+Con sesión iniciada, el APK registra su token push en el API y lo da de baja al cerrar sesión; al tocar un aviso se abre el pedido o la solicitud de la reserva. Detalles en la sección 5 de esa guía.
+
 ## Android Studio
 
 Proyecto Android generado localmente. Sigue [Instalación con Android Studio](docs/ANDROID_STUDIO.md) para abrirlo, seleccionar JDK 17 y ejecutar en el Pixel_7 o teléfono USB. Firebase no es necesario para probar las pantallas; sí para el push real.
 
-## Acceso y estadía de demostración
+## Acceso y estadía (HU-HUE-08, HU-HUE-09)
 
-Entrar con mi correo → `ana@example.com` → código `123456` → estadía activa. Puedes revisar el selector de reservas y cerrar la sesión de prueba. El formulario muestra mensajes de código vencido/usado y bloqueo tras cinco intentos. No envía correo, no emite JWT y no sustituye la autenticación del servidor. El detalle de la estadía y la reserva futura usan datos locales. Las pantallas de Room Service y solicitudes usan datos de prueba. Su conexión con las áreas operativas y tiempo real sigue pendiente.
+Entrar con mi correo → código de seis dígitos enviado por correo (con el entorno local llega a Mailpit) → si hay una reserva `EN_ESTADIA` se abre su detalle; si no, el selector de reservas. Los mensajes de código inválido, vencido o bloqueo los define el API. «Cerrar sesión» revoca el refresh en el servidor y borra los tokens aunque no haya red. Requiere Spring con las rutas `/api/v1/app/*` y `EXPO_PUBLIC_API_URL` configurada.
 
-Ejecuta `pnpm test:acceso` para verificar el simulador. La conexión real espera OpenAPI, seguridad y Outbox del equipo.
+Ejecuta `pnpm test:acceso` para probar el cliente con un servidor simulado. La prueba conectada contra Spring y Mailpit se registra aparte.
 
-El menú permite cantidades y notas, muestra agotados y crea pedidos locales sin sumar cargos hasta su entrega. Las solicitudes permiten pedir limpieza, artículos con máximos y cancelar pendientes. Prueba las reglas con `pnpm test:servicios`. Estos datos no se sincronizan con la web, no se persisten y no generan push.
+## Room Service y pedidos (HU-HUE-10, HU-HUE-11)
+
+Durante la estadía el menú (`GET .../menu`) se agrupa por categoría con precio en quetzales; los productos `AGOTADO` se muestran sin permitir agregarlos. El carrito envía solo ítems y cantidades, con notas opcionales para el pedido (el contrato define notas por pedido, no por ítem); el servidor calcula precios y total, y el cargo llega a la cuenta al entregarse. Si un producto se agotó, el API responde 409 con los ítems afectados y el menú se recarga.
+
+«Mis pedidos» se suscribe por STOMP a `/user/queue/pedidos` en `ws(s)://<API>/ws` con el JWT del huésped mientras la pantalla está abierta. Cada evento `PEDIDO_ACTUALIZADO` reemplaza el pedido en la lista; al conectar o reconectar se recarga con `GET .../pedidos`. Un pedido cancelado muestra el motivo de Room Service. La app no cancela ni modifica pedidos.
+
+## Limpieza y artículos (HU-HUE-12 a HU-HUE-14)
+
+Durante la estadía (`EN_ESTADIA`) el huésped pide limpieza con comentario opcional o artículos del catálogo `GET .../articulos`, sin superar `cantidadMaxima`. Si ya hay una limpieza pendiente o en proceso, se muestra el aviso del API (409). La lista de solicitudes se recarga al abrir la pantalla y al deslizar; solo las `PENDIENTE` pueden cancelarse. Fuera de la estadía solo se consulta el historial. Prueba el cliente con `pnpm test:servicios`.
