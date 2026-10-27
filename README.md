@@ -48,17 +48,19 @@ La única variable pública es EXPO_PUBLIC_API_URL. No colocar secretos en EXPO_
 
 Desde la estadía, «Mi cuenta» consulta `GET /api/v1/app/reservas/{codigo}/cuenta` en cualquier estado de la reserva. Muestra cargos con fecha y monto en quetzales (IVA incluido), los anulados tachados con su motivo, los pagos con método y estado, y el saldo que calcula el servidor: cargos vigentes menos pagos aprobados. Es de solo lectura; se recarga al volver a la pantalla o al deslizar hacia abajo. Una reserva ajena muestra el error del API.
 
-## Check-out de prueba
+## Pago del saldo, check-out y factura (HU-HUE-16)
 
-El check-out todavía usa datos locales de `lib/mocks/cuenta.ts`. La hora simulada es el 8 de octubre de 2026 a las 10:00 de Guatemala.
+«Continuar al check-out» consulta `GET .../checkout`: el servidor informa saldo, bloqueos (fuera de la ventana de 00:00 a 12:00 del día de salida en Guatemala, pedido `EN_CAMINO`) y pedidos `NUEVO` o `EN_PREPARACION` que se cancelarán sin cargo; para confirmar se pide aceptar esa cancelación.
+
+Con saldo positivo, la acción de `GET .../pago-saldo/estado` decide el botón: iniciar o reintentar (`POST .../pago-saldo`), continuar un pago abierto o esperar la verificación. La pasarela de Recurrente (GTQ) se abre con `expo-web-browser` y vuelve a `villaserena://checkout`; el regreso no acredita el pago, la app consulta el estado hasta que el servidor lo confirme. El API debe configurar `APP_URL_RETORNO` con esa URL (en Expo Go, `Linking.createURL('checkout')` produce una URL `exp://`).
+
+Con saldo Q 0.00 se elige «Consumidor Final» o un NIT validado con su dígito verificador (admite K) y se confirma con `POST .../checkout`. La factura muestra serie, número, receptor, cargos y total, y abre el PDF con el enlace temporal de `GET /api/v1/facturas/{id}/pdf`. Tras finalizar, Room Service y solicitudes quedan deshabilitados por el estado de la reserva.
 
 ```sh
 pnpm test:cuenta
 ```
 
-La prueba cubre límites de horario, pedidos, NIT (incluido K), exclusión de cargos anulados y pagos no aprobados, pago pendiente y reintento sin doble cobro. La validación del NIT comprueba el dígito, no consulta el registro de contribuyentes.
-
-**Pendiente de integración:** Stripe Checkout con `expo-web-browser`, retorno villaserena://, consulta del saldo tras webhook, autorización del huésped, check-out transaccional y URL del PDF/correo. El botón de PDF está deshabilitado en los datos de prueba porque aún no existe una factura del servidor. No se han marcado estas tareas como completadas en el documento 17.
+La prueba cubre el NIT, el pago con retorno a la app, la espera de acreditación, saldo cero, consentimiento, check-out y PDF con un servidor simulado. La validación del NIT comprueba el dígito, no consulta el registro de contribuyentes.
 
 ## Development build preparado
 
@@ -73,8 +75,6 @@ Proyecto Android generado localmente. Sigue [Instalación con Android Studio](do
 Entrar con mi correo → código de seis dígitos enviado por correo (con el entorno local llega a Mailpit) → si hay una reserva `EN_ESTADIA` se abre su detalle; si no, el selector de reservas. Los mensajes de código inválido, vencido o bloqueo los define el API. «Cerrar sesión» revoca el refresh en el servidor y borra los tokens aunque no haya red. Requiere Spring con las rutas `/api/v1/app/*` y `EXPO_PUBLIC_API_URL` configurada.
 
 Ejecuta `pnpm test:acceso` para probar el cliente con un servidor simulado. La prueba conectada contra Spring y Mailpit se registra aparte.
-
-El check-out sigue con datos de prueba hasta su issue.
 
 ## Room Service y pedidos (HU-HUE-10, HU-HUE-11)
 
