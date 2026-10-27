@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Action, money, Notice, useCarga } from '../components/cuenta';
 import { abrirPasarela, confirmarCheckout, consultarCheckout, consultarPagoSaldo, esperarAcreditacion, iniciarPagoSaldo } from '../lib/api/checkout';
 import { reservaActual } from '../lib/api/huesped';
+import { olvidarDispositivo } from '../lib/api/push';
 import { normalizarNit, validarNit } from '../lib/nit';
 export default function CheckoutScreen() {
   const { codigo: param } = useLocalSearchParams<{ codigo?: string }>();
@@ -41,6 +42,7 @@ export default function CheckoutScreen() {
   });
   const confirm = () => run(async codigo => {
     await confirmarCheckout(codigo, { nit: consumer ? 'CF' : normalizarNit(nit), nombreComprador: buyerName.trim() }, consent);
+    await olvidarDispositivo().catch(() => undefined);
     router.replace({ pathname: '/factura', params: { codigo } });
   }, false);
   return <SafeAreaView edges={['bottom']} className="flex-1 bg-cream"><KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
