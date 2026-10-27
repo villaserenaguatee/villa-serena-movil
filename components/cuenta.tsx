@@ -17,7 +17,7 @@ export function useCarga<T>(load: () => Promise<T>) {
     finally { setRefreshing(false); }
   }, [load]);
   useFocusEffect(useCallback(() => { void reload(); }, [reload]));
-  return { data, refreshing, error, reload };
+  return { data, setData, refreshing, error, reload };
 }
 export function useAccount() {
   const [account, setAccount] = useState<Account | null>(null);
