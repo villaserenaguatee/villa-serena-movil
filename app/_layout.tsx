@@ -3,17 +3,21 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { onSessionCleared } from '../lib/sesion';
+import { isSessionActive, onSessionCleared, readSession, subscribeSession } from '../lib/sesion';
 import { closeDemoSession, isDemoSession, subscribeDemoSession } from '../lib/mocks/estadia';
 import { listenNotificationResponses } from '../lib/notificaciones';
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 export default function RootLayout() {
-  const signedIn = useSyncExternalStore(subscribeDemoSession, isDemoSession, () => false);
+  const session = useSyncExternalStore(subscribeSession, isSessionActive, () => false);
+  // La cuenta de prueba (OBJ-4D) sigue disponible hasta conectar cuenta y check-out.
+  const demo = useSyncExternalStore(subscribeDemoSession, isDemoSession, () => false);
+  const signedIn = session || demo;
+  useEffect(() => { void readSession().catch(() => { /* Sin sesión guardada legible. */ }); }, []);
   useEffect(() => onSessionCleared(() => { queryClient.clear(); closeDemoSession(); router.replace('/'); }), []);
   useEffect(() => {
     let disposed = false;
     let remove: (() => void) | undefined;
-    void listenNotificationResponses(path => { if (isDemoSession()) router.push(path); }).then(cleanup => {
+    void listenNotificationResponses(path => { void readSession().then(tokens => { if (tokens) router.push(path); }); }).then(cleanup => {
       if (disposed) cleanup(); else remove = cleanup;
     }).catch(() => { /* La aplicación sigue disponible sin notificaciones. */ });
     return () => { disposed = true; remove?.(); };
