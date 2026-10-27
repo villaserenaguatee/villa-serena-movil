@@ -2,8 +2,23 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import { Account, getAccount } from '../lib/mocks/cuenta';
-export const money = (cents: number) => `Q ${(cents / 100).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// Montos del contrato: quetzales con dos decimales, IVA incluido.
+export const money = (quetzales: number) => `Q ${quetzales.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 export const dateLabel = (value: string) => new Intl.DateTimeFormat('es-GT', { timeZone: 'America/Guatemala', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+// Carga al enfocar la pantalla y con deslizar hacia abajo; conserva el último dato si falla.
+export function useCarga<T>(load: () => Promise<T>) {
+  const [data, setData] = useState<T | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
+  const reload = useCallback(async () => {
+    setRefreshing(true);
+    try { setData(await load()); setError(''); }
+    catch (cause) { setError((cause as Error).message); }
+    finally { setRefreshing(false); }
+  }, [load]);
+  useFocusEffect(useCallback(() => { void reload(); }, [reload]));
+  return { data, refreshing, error, reload };
+}
 export function useAccount() {
   const [account, setAccount] = useState<Account | null>(null);
   const [refreshing, setRefreshing] = useState(false);

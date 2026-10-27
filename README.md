@@ -44,13 +44,13 @@ OBJ-0F parte 2: expo-dev-client, expo-notifications, Firebase y EAS. Push requie
 
 La única variable pública es EXPO_PUBLIC_API_URL. No colocar secretos en EXPO_PUBLIC_*. `.env` y credenciales Firebase están ignorados. No marcar el avance como terminado hasta verificar los criterios del prompt y fusionar el PR.
 
-## OBJ-4D — Cuenta y check-out de prueba
+## Cuenta (HU-HUE-15)
 
-Desde la bienvenida toca **Ver cuenta de prueba**. También puedes ejecutar `pnpm web` y abrir `/cuenta`. Son pantallas de la app móvil; no se agregaron a `villa-serena-web`.
+Desde la estadía, «Mi cuenta» consulta `GET /api/v1/app/reservas/{codigo}/cuenta` en cualquier estado de la reserva. Muestra cargos con fecha y monto en quetzales (IVA incluido), los anulados tachados con su motivo, los pagos con método y estado, y el saldo que calcula el servidor: cargos vigentes menos pagos aprobados. Es de solo lectura; se recarga al volver a la pantalla o al deslizar hacia abajo. Una reserva ajena muestra el error del API.
 
-El ejemplo muestra Q 1,925.00 de cargos vigentes y Q 1,800.00 de pagos aprobados: saldo Q 125.00. El cargo anulado y el pago fallido no suman. La cuenta se recarga al volver a la pantalla o deslizar hacia abajo en Android.
+## Check-out de prueba
 
-Recorrido: cuenta → check-out → aceptar cancelación del pedido en preparación → pagar saldo (simulación) → simular confirmación → Consumidor Final o NIT válido → confirmar → resumen de factura. La hora simulada es el 8 de octubre de 2026 a las 10:00 de Guatemala. Todos los datos y operaciones simuladas están en `lib/mocks/cuenta.ts`; se reinician al recargar la app. Para inspeccionar los bloqueos cambia la fecha de salida, DEMO_NOW o el pedido a EN_CAMINO en ese archivo.
+El check-out todavía usa datos locales de `lib/mocks/cuenta.ts`. La hora simulada es el 8 de octubre de 2026 a las 10:00 de Guatemala.
 
 ```sh
 pnpm test:cuenta
@@ -74,6 +74,6 @@ Entrar con mi correo → código de seis dígitos enviado por correo (con el ent
 
 Ejecuta `pnpm test:acceso` para probar el cliente con un servidor simulado. La prueba conectada contra Spring y Mailpit se registra aparte.
 
-Cuenta, check-out, Room Service, pedidos y solicitudes siguen con datos de prueba hasta sus issues; la cuenta de prueba de la bienvenida sigue disponible.
+Check-out, Room Service, pedidos y solicitudes siguen con datos de prueba hasta sus issues.
 
 El menú permite cantidades y notas, muestra agotados y crea pedidos locales sin sumar cargos hasta su entrega. Las solicitudes permiten pedir limpieza, artículos con máximos y cancelar pendientes. Prueba las reglas con `pnpm test:servicios`. Estos datos no se sincronizan con la web, no se persisten y no generan push.

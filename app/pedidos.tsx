@@ -13,6 +13,6 @@ export default function Orders() {
     <Notice text="Pedidos de prueba. El seguimiento en vivo y los avisos esperan el WebSocket y el API del equipo." />
     <Text accessibilityRole="header" className="mb-6 text-3xl text-navy">Mis pedidos</Text>
     {error ? <><Notice text={error} /><Action label="Reintentar" onPress={reload} /></> : null}
-    {orders.map(order => <View key={order.id} className="mb-4 gap-3 rounded-2xl bg-white p-5"><Text className="text-lg font-semibold text-navy">{labels[order.status]}</Text><Text className="text-muted">{dateLabel(order.date)}</Text><Text className="text-base text-navy">{order.description}</Text>{order.notes ? <Text className="text-muted">Notas: {order.notes}</Text> : null}<Text className="font-semibold text-navy">{money(order.cents)}</Text>{order.status === 'CANCELADO' ? <Text className="text-sm text-muted">Cancelado al finalizar la estadía.</Text> : null}</View>)}
+    {orders.map(order => <View key={order.id} className="mb-4 gap-3 rounded-2xl bg-white p-5"><Text className="text-lg font-semibold text-navy">{labels[order.status]}</Text><Text className="text-muted">{dateLabel(order.date)}</Text><Text className="text-base text-navy">{order.description}</Text>{order.notes ? <Text className="text-muted">Notas: {order.notes}</Text> : null}<Text className="font-semibold text-navy">{money(order.cents / 100)}</Text>{order.status === 'CANCELADO' ? <Text className="text-sm text-muted">Cancelado al finalizar la estadía.</Text> : null}</View>)}
   </ScrollView></SafeAreaView>;
 }

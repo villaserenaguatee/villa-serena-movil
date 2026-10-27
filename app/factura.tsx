@@ -19,7 +19,7 @@ export default function InvoiceScreen() {
         <Text className="mt-5 text-base text-navy">{invoice.buyer}</Text>
         <Text className="mt-2 text-sm text-muted">{invoice.nit === 'CF' ? 'Consumidor Final' : `NIT: ${invoice.nit}`}</Text>
         <Text className="mt-5 text-sm text-muted">Total · IVA incluido</Text>
-        <Text className="mt-2 text-2xl font-semibold text-navy">{money(account.charges.filter(c => c.status === 'VIGENTE').reduce((n, c) => n + c.cents, 0))}</Text>
+        <Text className="mt-2 text-2xl font-semibold text-navy">{money(account.charges.filter(c => c.status === 'VIGENTE').reduce((n, c) => n + c.cents, 0) / 100)}</Text>
         <Text className="mt-5 text-sm text-muted">Reserva finalizada · Cuenta cerrada</Text>
       </View>
       {pdfError ? <Notice text={pdfError} /> : null}

@@ -35,7 +35,7 @@ export default function CheckoutScreen() {
       {block ? <Notice text={block} /> : null}
       {error ? <Notice text={error} /> : null}
       {account && !block ? <>
-        <View className="mb-6 rounded-2xl bg-white p-5"><Text className="text-sm text-muted">Saldo pendiente</Text><Text className="mt-2 text-3xl font-semibold text-navy">{money(total)}</Text></View>
+        <View className="mb-6 rounded-2xl bg-white p-5"><Text className="text-sm text-muted">Saldo pendiente</Text><Text className="mt-2 text-3xl font-semibold text-navy">{money(total / 100)}</Text></View>
         {pending ? <View className="mb-6 rounded-2xl border border-gold bg-white p-4">
           <Text className="text-sm leading-6 text-navy">Tus pedidos nuevos o en preparación se cancelarán sin cargo al confirmar el check-out.</Text>
           <View className="mt-3 flex-row items-center gap-3"><Switch accessibilityLabel="Acepto cancelar mis pedidos pendientes" value={consent} onValueChange={setConsent} trackColor={{ true: '#0d2d52' }} /><Text className="flex-1 text-sm text-navy">Acepto la cancelación</Text></View>

@@ -4,16 +4,12 @@ import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { isSessionActive, onSessionCleared, readSession, subscribeSession } from '../lib/sesion';
-import { closeDemoSession, isDemoSession, subscribeDemoSession } from '../lib/mocks/estadia';
 import { listenNotificationResponses } from '../lib/notificaciones';
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 export default function RootLayout() {
-  const session = useSyncExternalStore(subscribeSession, isSessionActive, () => false);
-  // La cuenta de prueba (OBJ-4D) sigue disponible hasta conectar cuenta y check-out.
-  const demo = useSyncExternalStore(subscribeDemoSession, isDemoSession, () => false);
-  const signedIn = session || demo;
+  const signedIn = useSyncExternalStore(subscribeSession, isSessionActive, () => false);
   useEffect(() => { void readSession().catch(() => { /* Sin sesión guardada legible. */ }); }, []);
-  useEffect(() => onSessionCleared(() => { queryClient.clear(); closeDemoSession(); router.replace('/'); }), []);
+  useEffect(() => onSessionCleared(() => { queryClient.clear(); router.replace('/'); }), []);
   useEffect(() => {
     let disposed = false;
     let remove: (() => void) | undefined;
