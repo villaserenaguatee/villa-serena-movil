@@ -2,28 +2,71 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
-import { Action, Notice } from '../components/cuenta';
-import { estadoReservaLabel, listarReservas, ReservaResumen } from '../lib/api/huesped';
+import { Action, Loading, Notice } from '../components/cuenta';
+import { cerrarSesion, estadoReservaLabel, listarReservas, ReservaResumen } from '../lib/api/huesped';
+
 export default function Reservations() {
   const [reservas, setReservas] = useState<ReservaResumen[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
   const reload = useCallback(async () => {
     setBusy(true);
     try { setReservas(await listarReservas()); setError(''); }
     catch (cause) { setError((cause as Error).message); }
     finally { setBusy(false); }
   }, []);
+
   useFocusEffect(useCallback(() => { void reload(); }, [reload]));
-  return <SafeAreaView edges={['bottom']} className="flex-1 bg-cream"><ScrollView className="flex-1 bg-cream" contentContainerStyle={{ padding: 24 }} refreshControl={<RefreshControl refreshing={busy} onRefresh={reload} />}>
-    <Text accessibilityRole="header" className="mb-6 text-3xl text-navy">Mis reservas</Text>
-    {error ? <Notice text={error} /> : null}
-    {reservas?.length === 0 ? <Notice text="No encontramos reservas asociadas a tu correo." /> : null}
-    {reservas?.map(reserva => <View key={reserva.codigo} className="mb-4 gap-3 rounded-2xl bg-white p-5">
-      <Text className="text-xl text-navy">{reserva.codigo}</Text>
-      <Text className="text-muted">{reserva.entrada} → {reserva.salida}</Text>
-      <Text className="text-sm text-navy">{estadoReservaLabel[reserva.estado]}</Text>
-      <Action label="Ver detalle" secondary onPress={() => router.push({ pathname: '/estadia', params: { codigo: reserva.codigo } })} />
-    </View>)}
-  </ScrollView></SafeAreaView>;
+
+  return (
+    <SafeAreaView edges={['bottom']} className="flex-1 bg-cream">
+      <ScrollView
+        className="flex-1 bg-cream"
+        contentContainerStyle={{ padding: 20, gap: 16 }}
+        refreshControl={<RefreshControl refreshing={busy} onRefresh={reload} />}
+      >
+        <View className="rounded-[28px] border border-line bg-sand p-6">
+          <Text className="text-[10px] font-semibold uppercase tracking-[3px] text-gold">Portal del Huésped</Text>
+          <Text accessibilityRole="header" className="mt-1 text-2xl font-light text-navy">
+            Mis reservas
+          </Text>
+          <Text className="mt-1 text-xs leading-5 text-muted">
+            Selecciona tu reserva para abrir el portal de tu estancia.
+          </Text>
+        </View>
+
+        {error ? <Notice text={error} /> : null}
+        {!reservas && !error ? <Loading label="Cargando reservas…" /> : null}
+        {reservas?.length === 0 ? <Notice text="No encontramos reservas asociadas a tu correo." /> : null}
+
+        {reservas?.map(reserva => (
+          <View key={reserva.codigo} className="gap-3 rounded-[28px] border border-line bg-white p-5">
+            <View className="flex-row items-center justify-between">
+              <Text className="text-xl font-semibold text-navy">{reserva.codigo}</Text>
+              <View className="rounded-full border border-line bg-sand px-3 py-1">
+                <Text className="text-xs font-semibold text-navy">{estadoReservaLabel[reserva.estado]}</Text>
+              </View>
+            </View>
+            <View className="flex-row gap-2">
+              <View className="flex-1 rounded-xl border border-line bg-cream p-3">
+                <Text className="text-[10px] uppercase tracking-widest text-muted">Entrada</Text>
+                <Text className="mt-0.5 text-sm font-semibold text-navy">{reserva.entrada}</Text>
+              </View>
+              <View className="flex-1 rounded-xl border border-line bg-cream p-3">
+                <Text className="text-[10px] uppercase tracking-widest text-muted">Salida</Text>
+                <Text className="mt-0.5 text-sm font-semibold text-navy">{reserva.salida}</Text>
+              </View>
+            </View>
+            <Action
+              label="Abrir mi estancia"
+              onPress={() => router.push({ pathname: '/estadia', params: { codigo: reserva.codigo } })}
+            />
+          </View>
+        ))}
+
+        <Action label="Cerrar sesión" secondary onPress={() => { void cerrarSesion(); }} />
+      </ScrollView>
+    </SafeAreaView>
+  );
 }

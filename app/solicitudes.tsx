@@ -2,16 +2,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
-import { Action, dateLabel, Notice, useCarga } from '../components/cuenta';
+import { Action, dateLabel, Loading, Notice, useCarga } from '../components/cuenta';
 import { detalleReserva, reservaActual } from '../lib/api/huesped';
 import { cancelarSolicitud, describirSolicitud, estadoSolicitudLabel, listarArticulos, listarSolicitudes, solicitarArticulos, solicitarLimpieza } from '../lib/api/solicitudes';
 export default function Requests() {
   const { codigo: param } = useLocalSearchParams<{ codigo?: string }>();
   const { data, refreshing, error: loadError, reload } = useCarga(useCallback(async () => {
     const codigo = await reservaActual(param);
-    const [reserva, solicitudes] = await Promise.all([detalleReserva(codigo), listarSolicitudes(codigo)]);
+    const [reserva, solicitudes, articulos] = await Promise.all([
+      detalleReserva(codigo),
+      listarSolicitudes(codigo).catch(() => []),
+      listarArticulos(codigo).catch(() => []),
+    ]);
     const active = reserva.estado === 'EN_ESTADIA';
-    return { codigo, active, solicitudes, articulos: active ? await listarArticulos(codigo) : [] };
+    return { codigo, active, solicitudes, articulos };
   }, [param]));
   const [comment, setComment] = useState('');
   const [counts, setCounts] = useState<Record<number, number>>({});
@@ -26,13 +30,14 @@ export default function Requests() {
   return <SafeAreaView edges={['bottom']} className="flex-1 bg-cream"><ScrollView className="flex-1 bg-cream" keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} />}>
     <Text accessibilityRole="header" className="mb-6 text-3xl text-navy">Limpieza y artículos</Text>
     {loadError ? <Notice text={loadError} /> : null}
+    {!data && !loadError ? <Loading label="Cargando solicitudes…" /> : null}
     {error ? <Notice text={error} /> : null}
     {message ? <Notice text={message} /> : null}
     {data?.active ? <>
-      <View className="mb-6 gap-3 rounded-2xl bg-white p-5"><Text className="text-xl text-navy">Solicitar limpieza</Text><TextInput accessibilityLabel="Comentario de limpieza" value={comment} onChangeText={setComment} maxLength={500} multiline placeholder="Comentario (opcional), por ejemplo: después de las 2:00 p. m." className="rounded-xl border border-muted/30 p-4 text-navy" /><Action label="Pedir limpieza" disabled={busy} onPress={() => run(async codigo => { await solicitarLimpieza(codigo, comment); setComment(''); }, 'Solicitud de limpieza enviada.')} /></View>
+      <View className="mb-6 gap-3 rounded-2xl bg-white p-5"><Text className="text-xl text-navy">Solicitar limpieza</Text><TextInput accessibilityLabel="Comentario de limpieza" value={comment} onChangeText={setComment} maxLength={500} multiline placeholder="Comentario (opcional), por ejemplo: después de las 2:00 p. m." className="rounded-xl border border-muted/30 p-4 text-navy" /><Action label={busy ? 'Enviando…' : 'Pedir limpieza'} disabled={busy} onPress={() => run(async codigo => { await solicitarLimpieza(codigo, comment); setComment(''); }, 'Solicitud de limpieza enviada.')} /></View>
       <Text className="mb-3 text-xl text-navy">Artículos para tu habitación</Text>
       {data.articulos.map(item => <View key={item.id} className="mb-3 gap-3 rounded-2xl bg-white p-5"><Text className="text-lg text-navy">{item.nombre} · Máximo {item.cantidadMaxima}</Text><View className="flex-row items-center gap-3"><View className="flex-1"><Action label="−" accessibilityLabel={`Quitar ${item.nombre}`} secondary disabled={!counts[item.id] || busy} onPress={() => setCounts({ ...counts, [item.id]: Math.max(0, (counts[item.id] ?? 0) - 1) })} /></View><Text className="text-navy">{counts[item.id] ?? 0}</Text><View className="flex-1"><Action label="+" accessibilityLabel={`Agregar ${item.nombre}`} secondary disabled={(counts[item.id] ?? 0) >= item.cantidadMaxima || busy} onPress={() => setCounts({ ...counts, [item.id]: (counts[item.id] ?? 0) + 1 })} /></View></View></View>)}
-      <Action label="Pedir artículos" disabled={busy || !Object.values(counts).some(count => count > 0)} onPress={() => run(async codigo => { await solicitarArticulos(codigo, counts); setCounts({}); }, 'Solicitud de artículos enviada.')} />
+      <Action label={busy ? 'Enviando…' : 'Pedir artículos'} disabled={busy || !Object.values(counts).some(count => count > 0)} onPress={() => run(async codigo => { await solicitarArticulos(codigo, counts); setCounts({}); }, 'Solicitud de artículos enviada.')} />
     </> : data ? <Notice text="Estos servicios están disponibles solo durante la estadía." /> : null}
     <Text accessibilityRole="header" className="my-6 text-xl text-navy">Mis solicitudes</Text>
     {data && !data.solicitudes.length ? <Text className="text-muted">Todavía no tienes solicitudes.</Text> : null}

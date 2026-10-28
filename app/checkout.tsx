@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Action, money, Notice, useCarga } from '../components/cuenta';
+import { Action, Loading, money, Notice, useCarga } from '../components/cuenta';
 import { abrirPasarela, confirmarCheckout, consultarCheckout, consultarPagoSaldo, esperarAcreditacion, iniciarPagoSaldo } from '../lib/api/checkout';
 import { reservaActual } from '../lib/api/huesped';
 import { olvidarDispositivo } from '../lib/api/push';
@@ -50,6 +50,7 @@ export default function CheckoutScreen() {
       <Text accessibilityRole="header" className="text-3xl text-navy">Antes de despedirnos</Text>
       <Text className="mb-6 mt-3 text-base leading-6 text-muted">Revisa tu saldo y los datos de tu factura. El check-out en la app está disponible el día de salida, de 00:00 a 12:00 (Guatemala).</Text>
       {loadError ? <><Notice text={loadError} /><Action label="Reintentar" onPress={reload} /></> : null}
+      {!data && !loadError ? <Loading label="Cargando datos de check-out…" /> : null}
       {vista?.motivosBloqueo.map(motivo => <Notice key={motivo} text={motivo} />)}
       {vista?.pedidoEnCamino ? <Notice text="Tienes un pedido en camino. Espera su entrega para continuar." /> : null}
       {error ? <Notice text={error} /> : null}

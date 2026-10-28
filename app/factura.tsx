@@ -2,7 +2,7 @@ import { Linking, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Action, dateLabel, money, Notice, useCarga } from '../components/cuenta';
+import { Action, dateLabel, Loading, money, Notice, useCarga } from '../components/cuenta';
 import { consultarFactura, enlaceFacturaPdf } from '../lib/api/checkout';
 import { reservaActual } from '../lib/api/huesped';
 export default function InvoiceScreen() {
@@ -19,6 +19,7 @@ export default function InvoiceScreen() {
   }
   return <SafeAreaView edges={['bottom']} className="flex-1 bg-cream"><ScrollView contentContainerStyle={{ padding: 24 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} />}>
     {error ? <><Notice text={error} /><Action label="Reintentar" onPress={reload} /></> : null}
+    {!invoice && !error ? <Loading label="Cargando factura…" /> : null}
     {invoice ? <>
       <View className="mb-6 h-1 w-12 bg-gold" />
       <Text accessibilityRole="header" className="text-3xl text-navy">Gracias por tu visita.</Text>
