@@ -2,7 +2,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
-import { Action, dateLabel, money, Notice, useCarga } from '../components/cuenta';
+import { Action, dateLabel, Loading, money, Notice, useCarga } from '../components/cuenta';
 import { reservaActual } from '../lib/api/huesped';
 import { aplicarPedido, estadoPedidoLabel, listarPedidos } from '../lib/api/pedidos';
 import { suscribirPedidos } from '../lib/tiempo-real';
@@ -20,6 +20,7 @@ export default function Orders() {
     <Text accessibilityRole="header" className="text-3xl text-navy">Mis pedidos</Text>
     <Text className="mb-6 mt-2 text-xs text-muted">{live ? 'Actualización en vivo' : 'Conectando para actualizar en vivo…'}</Text>
     {error ? <><Notice text={error} /><Action label="Reintentar" onPress={reload} /></> : null}
+    {!orders && !error ? <Loading label="Cargando pedidos…" /> : null}
     {orders && !orders.length ? <Text className="text-muted">Todavía no tienes pedidos.</Text> : null}
     {orders?.map(order => <View key={order.id} className="mb-4 gap-3 rounded-2xl bg-white p-5">
       <Text className="text-lg font-semibold text-navy">{estadoPedidoLabel[order.estado]}</Text>

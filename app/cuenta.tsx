@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Action, dateLabel, money, Notice, useCarga } from '../components/cuenta';
+import { Action, dateLabel, Loading, money, Notice, useCarga } from '../components/cuenta';
 import { consultarCuenta, estadoPagoLabel, metodoPagoLabel } from '../lib/api/cuenta';
 import { reservaActual } from '../lib/api/huesped';
 export default function AccountScreen() {
@@ -11,7 +11,7 @@ export default function AccountScreen() {
   return <SafeAreaView edges={['bottom']} className="flex-1 bg-cream">
     <ScrollView contentContainerStyle={{ padding: 24 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} />}>
       {error ? <><Notice text={error} /><Action label="Reintentar" onPress={reload} /></> : null}
-      {!account ? (error ? null : <Text className="text-muted">Cargando cuenta…</Text>) : <>
+      {!account ? (error ? null : <Loading label="Cargando cuenta…" />) : <>
         <Text className="text-xs uppercase tracking-widest text-muted">{account.codigoReserva} · {account.estadoCuenta === 'ABIERTA' ? 'Cuenta abierta' : 'Cuenta cerrada'}</Text>
         <Text accessibilityRole="header" className="mt-2 text-3xl text-navy">Mi cuenta</Text>
         <Text className="mt-2 text-base text-muted">{account.nombreHuesped}</Text>
