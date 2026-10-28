@@ -14,6 +14,7 @@ import {
   iniciarPagoReservaPublica,
   listarReservas,
   OpcionDisponiblePublica,
+  ReservaWebCreada,
   solicitarCodigo,
   solicitarVerificacionReserva,
   verificarCodigo,
@@ -50,8 +51,10 @@ export default function Access() {
   const [nacionalidad, setNacionalidad] = useState('Guatemalteca');
 
   const [borradorId, setBorradorId] = useState(() => generarBorradorId());
-  const [pasoReserva, setPasoReserva] = useState<'datos' | 'verificar'>('datos');
+  const [pasoReserva, setPasoReserva] = useState<'datos' | 'verificar' | 'pagar'>('datos');
   const [codigoReservaOtp, setCodigoReservaOtp] = useState('');
+  const [reservaCreada, setReservaCreada] = useState<ReservaWebCreada | null>(null);
+  const [pagadaEnApp, setPagadaEnApp] = useState(false);
 
   async function run(action: () => Promise<void>) {
     if (busy) return;
@@ -127,23 +130,34 @@ export default function Access() {
       borradorId,
       verif.comprobante,
     );
-    // Abre Recurrente para pagar la reserva recién creada desde la app
-    try {
-      const sesionPago = await iniciarPagoReservaPublica(creada.codigo);
-      if (sesionPago?.urlPago) {
-        await abrirPasarela(sesionPago.urlPago);
-        await esperarPagoReservaPublica(creada.codigo, 6, 2000).catch(() => null);
-      }
-    } catch {
-      /* Si el usuario cierra la pasarela, igual podrá pagar desde su estancia */
+    setReservaCreada(creada);
+    setPagadaEnApp(false);
+    setPasoReserva('pagar');
+    setMessage(`¡Reserva ${creada.codigo} creada! Ahora puedes pagarla con Recurrente para confirmarla al instante.`);
+  });
+
+  const pagarReservaRecienCreada = () => run(async () => {
+    if (!reservaCreada) return;
+    setMessage('');
+    const sesionPago = await iniciarPagoReservaPublica(reservaCreada.codigo);
+    await abrirPasarela(sesionPago.urlPago);
+    const est = await esperarPagoReservaPublica(reservaCreada.codigo, 8, 2500);
+    if (est.estadoReserva === 'CONFIRMADA') {
+      setPagadaEnApp(true);
+      setMessage(`¡Pago aprobado! Tu reserva ${reservaCreada.codigo} ya está CONFIRMADA.`);
+    } else {
+      setMessage('Recibimos tu operación en Recurrente. Toca «Entrar a mi estancia» para revisar tu reserva.');
     }
-    // Solicita inmediatamente el código de acceso a la app para entrar directo
+  });
+
+  const entrarTrasReserva = () => run(async () => {
+    const correoLimpio = correoNuevo.trim().toLowerCase();
     await solicitarCodigo(correoLimpio);
     setEmail(correoLimpio);
     setModo('login');
     setStep('code');
     setCode('');
-    setMessage(`¡Reserva ${creada.codigo} registrada! Te enviamos un código de acceso a ${correoLimpio} para entrar a tu estancia.`);
+    setMessage(`Te enviamos un código de 6 dígitos a ${correoLimpio} para entrar a tu estancia.`);
   });
 
   return (
@@ -412,10 +426,10 @@ export default function Access() {
                     onPress={pedirCodigoNuevaReserva}
                   />
                 </>
-              ) : (
+              ) : pasoReserva === 'verificar' ? (
                 <>
                   <Text className="text-xs font-semibold uppercase tracking-widest text-gold">
-                    Confirmar correo de la reserva
+                    2. Confirmar correo de la reserva
                   </Text>
                   <Text className="text-sm text-muted">
                     Ingresa el código de 6 dígitos que enviamos a {correoNuevo.trim().toLowerCase()} para crear tu reserva.
@@ -429,7 +443,7 @@ export default function Access() {
                     className="rounded-2xl border border-line bg-cream p-4 text-center text-3xl font-light tracking-[10px] text-navy"
                   />
                   <Action
-                    label={busy ? 'Creando reserva…' : 'Confirmar y crear mi reserva'}
+                    label={busy ? 'Creando reserva…' : 'Confirmar y continuar al pago'}
                     disabled={busy || codigoReservaOtp.length !== 6}
                     onPress={confirmarYCrearReserva}
                   />
@@ -440,6 +454,50 @@ export default function Access() {
                   >
                     <Text className="text-center text-sm text-muted">Volver a mis datos</Text>
                   </Pressable>
+                </>
+              ) : (
+                <>
+                  <Text className="text-xs font-semibold uppercase tracking-widest text-gold">
+                    3. Pago en línea · Recurrente
+                  </Text>
+                  <View className="gap-2 rounded-2xl border border-gold bg-sand p-4">
+                    <View className="flex-row items-center justify-between">
+                      <Text className="text-lg font-semibold text-navy">{reservaCreada?.codigo}</Text>
+                      <Text className="text-xs font-semibold text-gold">
+                        {pagadaEnApp ? 'CONFIRMADA' : 'PENDIENTE DE PAGO'}
+                      </Text>
+                    </View>
+                    <Text className="text-sm text-navy">
+                      {reservaCreada?.tipoHabitacion.nombre} · {reservaCreada?.noches}{' '}
+                      {reservaCreada?.noches === 1 ? 'noche' : 'noches'}
+                    </Text>
+                    <Text className="text-xs text-muted">
+                      Entrada {reservaCreada?.entrada} · Salida {reservaCreada?.salida}
+                    </Text>
+                    <Text className="mt-1 text-2xl font-bold text-navy">
+                      Total: {reservaCreada ? money(reservaCreada.total) : '—'}
+                    </Text>
+                  </View>
+
+                  {!pagadaEnApp ? (
+                    <>
+                      <Text className="text-xs leading-5 text-muted">
+                        Paga con tarjeta en la pasarela segura de Recurrente (modo prueba: tarjeta 4242 4242 4242 4242, cualquier vencimiento futuro y CVC de 3 dígitos).
+                      </Text>
+                      <Action
+                        label={busy ? 'Abriendo pasarela Recurrente…' : `Pagar ahora con Recurrente · ${reservaCreada ? money(reservaCreada.total) : ''}`}
+                        disabled={busy}
+                        onPress={pagarReservaRecienCreada}
+                      />
+                    </>
+                  ) : null}
+
+                  <Action
+                    label={busy ? 'Enviando código…' : 'Entrar a mi estancia en la app'}
+                    secondary={!pagadaEnApp}
+                    disabled={busy}
+                    onPress={entrarTrasReserva}
+                  />
                 </>
               )}
             </View>
