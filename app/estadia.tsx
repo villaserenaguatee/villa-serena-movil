@@ -1,9 +1,10 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { Action, dateLabel, Loading, money, Notice, useCarga } from '../components/cuenta';
-import { consultarCuenta } from '../lib/api/cuenta';
+import { abrirPasarela, esperarAcreditacion, iniciarPagoSaldo } from '../lib/api/checkout';
+import { consultarCuenta, estadoPagoLabel, metodoPagoLabel } from '../lib/api/cuenta';
 import { consultarMenu, crearPedido, estadoPedidoLabel, listarPedidos, totalCarrito } from '../lib/api/pedidos';
 import {
   cancelarSolicitud,
@@ -20,16 +21,18 @@ import {
   consultarWifi,
   detalleReserva,
   enviarMensajeChat,
+  esperarPagoReservaPublica,
   estadoReservaLabel,
+  iniciarPagoReservaPublica,
   listarAmenidades,
   listarDocumentosCheckin,
   listarMensajesChat,
   reservaActual,
 } from '../lib/api/huesped';
 
-type SeccionPortal = 'inicio' | 'checkin' | 'menu' | 'servicios' | 'chat' | 'habitacion' | 'experiencias' | 'reservar' | 'perfil';
+type SeccionPortal = 'inicio' | 'checkin' | 'menu' | 'servicios' | 'chat' | 'habitacion' | 'experiencias' | 'cuenta' | 'reservar' | 'perfil';
 
-const SECCIONES: { id: SeccionPortal | 'cuenta'; label: string }[] = [
+const SECCIONES: { id: SeccionPortal; label: string }[] = [
   { id: 'inicio', label: 'Mi estancia' },
   { id: 'checkin', label: 'Check-in' },
   { id: 'menu', label: 'Menú' },
@@ -37,7 +40,7 @@ const SECCIONES: { id: SeccionPortal | 'cuenta'; label: string }[] = [
   { id: 'chat', label: 'Chat' },
   { id: 'habitacion', label: 'Mi habitación' },
   { id: 'experiencias', label: 'Experiencias' },
-  { id: 'cuenta', label: 'Cuenta' },
+  { id: 'cuenta', label: 'Cuenta y Pagos' },
   { id: 'reservar', label: 'Gestionar' },
   { id: 'perfil', label: 'Perfil' },
 ];
@@ -81,6 +84,10 @@ export default function StayScreen() {
   const [enviandoChat, setEnviandoChat] = useState(false);
   const [avisoChat, setAvisoChat] = useState<string | null>(null);
 
+  // Estados para Pago con Recurrente
+  const [pagando, setPagando] = useState(false);
+  const [avisoPago, setAvisoPago] = useState<string | null>(null);
+
   const cargarTodo = useCallback(async () => {
     const cod = await reservaActual(codigo);
     const [stay, perfil, cuenta, menu, pedidos, articulos, solicitudes, wifi, amenidades, mensajes, documentos] = await Promise.all([
@@ -121,11 +128,7 @@ export default function StayScreen() {
     if (stay) router.push({ pathname, params: { codigo: stay.codigo } });
   };
 
-  const seleccionarTab = (id: (typeof SECCIONES)[number]['id']) => {
-    if (id === 'cuenta') {
-      go('/cuenta');
-      return;
-    }
+  const seleccionarTab = (id: SeccionPortal) => {
     setSeccion(id);
   };
 
@@ -211,70 +214,129 @@ export default function StayScreen() {
     }
   }
 
+  async function handlePagarRecurrente() {
+    if (!stay || pagando) return;
+    setPagando(true);
+    setAvisoPago(null);
+    try {
+      if (stay.estado === 'PENDIENTE_PAGO') {
+        const sesion = await iniciarPagoReservaPublica(stay.codigo);
+        await abrirPasarela(sesion.urlPago);
+        const est = await esperarPagoReservaPublica(stay.codigo, 8, 2500);
+        setAvisoPago(
+          est.estadoReserva === 'CONFIRMADA'
+            ? '¡Pago confirmado! Tu reserva ya está confirmada.'
+            : 'Estamos verificando tu pago con Recurrente. Desliza para actualizar en unos segundos.',
+        );
+      } else if (stay.estado === 'EN_ESTADIA') {
+        const sesion = await iniciarPagoSaldo(stay.codigo);
+        if (sesion?.urlPago) {
+          await abrirPasarela(sesion.urlPago);
+          await esperarAcreditacion(stay.codigo, 8, 2500);
+          setAvisoPago('Pago procesado con Recurrente.');
+        } else {
+          setAvisoPago('Tu saldo actual ya está en Q 0.00.');
+        }
+      }
+      await reload();
+    } catch (e) {
+      setAvisoPago(e instanceof Error ? e.message : 'No se pudo iniciar el pago con Recurrente.');
+    } finally {
+      setPagando(false);
+    }
+  }
+
   const alojTotal = cuenta?.cargos.filter(c => c.tipo === 'ALOJAMIENTO' && c.estado === 'VIGENTE').reduce((acc, c) => acc + c.monto, 0) ?? 0;
   const extrasTotal = cuenta ? Math.max(0, cuenta.totalCargosVigentes - alojTotal) : 0;
   const totalMenu = menu ? totalCarrito(menu, carrito) : 0;
 
   return (
     <SafeAreaView edges={['bottom']} className="flex-1 bg-cream">
-      {/* Cabecera estilo Portal del Huésped en beige cálido */}
-      {stay ? (
-        <View className="border-b border-line bg-sand px-5 pb-3.5 pt-3">
-          <View className="flex-row items-center justify-between">
-            <View className="flex-1 pr-2">
-              <Text className="text-[10px] font-semibold uppercase tracking-[2.5px] text-gold">Bienvenida a Villa Serena</Text>
-              <Text className="mt-0.5 text-2xl font-light text-navy">Hola, {primerNombre}</Text>
-            </View>
-            <View className="flex-row gap-2">
-              <Pressable onPress={() => router.push('/reservas')} className="rounded-xl border border-line bg-cream px-3 py-1.5">
-                <Text className="text-xs font-semibold text-navy">Reservas</Text>
-              </Pressable>
-              <Pressable onPress={() => setSeccion('perfil')} className="rounded-xl bg-gold px-3 py-1.5">
-                <Text className="text-xs font-semibold text-white">Perfil</Text>
-              </Pressable>
-            </View>
-          </View>
-          <View className="mt-2 flex-row flex-wrap items-center gap-2">
-            <View className="rounded-full border border-line bg-cream px-2.5 py-0.5">
-              <Text className="text-xs font-semibold text-gold">{estadoReservaLabel[stay.estado]}</Text>
-            </View>
-            <Text className="text-xs text-muted">
-              {stay.codigo} · Hab. {stay.habitacion?.numero ?? 'Por asignar'} · Salida {stay.salida}
-            </Text>
-          </View>
-
-          {/* Barra de pestañas idéntica a Huésped Web */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-3" contentContainerStyle={{ gap: 8 }}>
-            {SECCIONES.map(tab => {
-              const isSelected = seccion === tab.id;
-              return (
-                <Pressable
-                  key={tab.id}
-                  onPress={() => seleccionarTab(tab.id)}
-                  className={`rounded-full border px-3.5 py-1.5 ${isSelected ? 'border-gold bg-gold' : 'border-line bg-cream'}`}
-                >
-                  <Text className={`text-xs font-semibold ${isSelected ? 'text-white' : 'text-navy'}`}>
-                    {tab.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-      ) : null}
-
-      <ScrollView
-        className="flex-1 bg-cream"
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ padding: 20, gap: 16 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} />}
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
       >
+        {/* Cabecera estilo Portal del Huésped en beige cálido */}
+        {stay ? (
+          <View className="border-b border-line bg-sand px-5 pb-3.5 pt-3">
+            <View className="flex-row items-center justify-between">
+              <View className="flex-1 pr-2">
+                <Text className="text-[10px] font-semibold uppercase tracking-[2.5px] text-gold">Bienvenida a Villa Serena</Text>
+                <Text className="mt-0.5 text-2xl font-light text-navy">Hola, {primerNombre}</Text>
+              </View>
+              <View className="flex-row gap-2">
+                <Pressable onPress={() => router.push('/reservas')} className="rounded-xl border border-line bg-cream px-3 py-1.5">
+                  <Text className="text-xs font-semibold text-navy">Reservas</Text>
+                </Pressable>
+                <Pressable onPress={() => setSeccion('perfil')} className="rounded-xl bg-gold px-3 py-1.5">
+                  <Text className="text-xs font-semibold text-white">Perfil</Text>
+                </Pressable>
+              </View>
+            </View>
+            <View className="mt-2 flex-row flex-wrap items-center gap-2">
+              <View className="rounded-full border border-line bg-cream px-2.5 py-0.5">
+                <Text className="text-xs font-semibold text-gold">{estadoReservaLabel[stay.estado]}</Text>
+              </View>
+              <Text className="text-xs text-muted">
+                {stay.codigo} · Hab. {stay.habitacion?.numero ?? 'Por asignar'} · Salida {stay.salida}
+              </Text>
+            </View>
+
+            {/* Barra de pestañas idéntica a Huésped Web */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-3" contentContainerStyle={{ gap: 8 }}>
+              {SECCIONES.map(tab => {
+                const isSelected = seccion === tab.id;
+                return (
+                  <Pressable
+                    key={tab.id}
+                    onPress={() => seleccionarTab(tab.id)}
+                    className={`rounded-full border px-3.5 py-1.5 ${isSelected ? 'border-gold bg-gold' : 'border-line bg-cream'}`}
+                  >
+                    <Text className={`text-xs font-semibold ${isSelected ? 'text-white' : 'text-navy'}`}>
+                      {tab.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ) : null}
+
+        <ScrollView
+          className="flex-1 bg-cream"
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          contentContainerStyle={{ padding: 20, paddingBottom: 140, gap: 16 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} />}
+        >
         {error ? <Notice text={error} /> : null}
         {!stay && !error ? <Loading label="Cargando portal del huésped…" /> : null}
 
         {/* Pestaña: MI ESTANCIA (inicio) */}
         {stay && seccion === 'inicio' ? (
           <>
+            {avisoPago ? <Notice text={avisoPago} /> : null}
+
+            {stay.estado === 'PENDIENTE_PAGO' ? (
+              <View className="gap-3 rounded-3xl border border-gold bg-sand p-5">
+                <Text className="text-xs font-semibold uppercase tracking-widest text-gold">
+                  Acción requerida · Reserva pendiente de pago
+                </Text>
+                <Text className="text-lg font-semibold text-navy">
+                  Confirma tu reserva con Recurrente
+                </Text>
+                <Text className="text-xs leading-5 text-muted">
+                  Realiza el pago de tu alojamiento en línea para pasar tu reserva a Confirmada. En modo prueba puedes usar la tarjeta 4242 4242 4242 4242.
+                </Text>
+                <Action
+                  label={pagando ? 'Abriendo pasarela Recurrente…' : `Pagar reserva ahora${cuenta ? ` · ${money(cuenta.saldo)}` : ''}`}
+                  disabled={pagando}
+                  onPress={() => { void handlePagarRecurrente(); }}
+                />
+              </View>
+            ) : null}
+
             {!cerrada ? (
               <View className="gap-2 rounded-2xl border border-gold bg-white p-4">
                 <Text className="text-base font-semibold text-navy">Documentos del check-in</Text>
@@ -331,8 +393,8 @@ export default function StayScreen() {
             <View className="gap-3 rounded-3xl border border-line bg-white p-5">
               <View className="flex-row items-center justify-between">
                 <Text className="text-lg font-bold text-navy">Tu cuenta</Text>
-                <Pressable onPress={() => go('/cuenta')}>
-                  <Text className="text-xs font-semibold text-navy underline">Ver detalle</Text>
+                <Pressable onPress={() => setSeccion('cuenta')}>
+                  <Text className="text-xs font-semibold text-navy underline">Ver cargos y pagar</Text>
                 </Pressable>
               </View>
               <View className="flex-row items-end justify-between">
@@ -364,6 +426,13 @@ export default function StayScreen() {
                     <Text className="mt-0.5 text-xs font-semibold text-navy">{money(cuenta.totalPagosAprobados)}</Text>
                   </View>
                 </View>
+              ) : null}
+              {cuenta && cuenta.saldo > 0 && (stay.estado === 'PENDIENTE_PAGO' || stay.estado === 'EN_ESTADIA') ? (
+                <Action
+                  label={pagando ? 'Abriendo Recurrente…' : `Pagar con Recurrente · ${money(cuenta.saldo)}`}
+                  disabled={pagando}
+                  onPress={() => { void handlePagarRecurrente(); }}
+                />
               ) : null}
             </View>
 
@@ -917,6 +986,103 @@ export default function StayScreen() {
           </View>
         ) : null}
 
+        {/* Pestaña: CUENTA Y PAGOS */}
+        {stay && seccion === 'cuenta' ? (
+          <View className="gap-4">
+            {avisoPago ? <Notice text={avisoPago} /> : null}
+
+            <View className="gap-3 rounded-3xl border border-gold bg-sand p-6">
+              <Text className="text-xs font-semibold uppercase tracking-widest text-gold">
+                {cuenta?.estadoCuenta === 'CERRADA' ? 'Cuenta cerrada' : 'Estado de cuenta y pagos'}
+              </Text>
+              <Text className="text-sm text-muted">
+                {cuenta && cuenta.saldo < 0 ? 'Saldo a tu favor' : 'Saldo pendiente de pago'}
+              </Text>
+              <Text className="text-4xl font-light text-navy">
+                {cuenta ? money(Math.abs(cuenta.saldo)) : 'Consultando…'}
+              </Text>
+              {cuenta ? (
+                <Text className="text-xs leading-5 text-muted">
+                  Total de cargos vigentes: {money(cuenta.totalCargosVigentes)} · Pagos aprobados: {money(cuenta.totalPagosAprobados)} (IVA incluido).
+                </Text>
+              ) : null}
+
+              {cuenta && cuenta.saldo > 0 && (stay.estado === 'PENDIENTE_PAGO' || stay.estado === 'EN_ESTADIA') ? (
+                <View className="mt-2 gap-2 border-t border-line pt-3">
+                  <Text className="text-xs leading-5 text-navy">
+                    {stay.estado === 'PENDIENTE_PAGO'
+                      ? 'Tu reserva está pendiente de pago. Paga ahora con tarjeta en Recurrente para confirmarla al instante (prueba: 4242 4242 4242 4242).'
+                      : 'Paga tu saldo en línea con Recurrente para dejar tu cuenta en Q 0.00.'}
+                  </Text>
+                  <Action
+                    label={pagando ? 'Abriendo pasarela Recurrente…' : `Pagar ahora con Recurrente · ${money(cuenta.saldo)}`}
+                    disabled={pagando}
+                    onPress={() => { void handlePagarRecurrente(); }}
+                  />
+                </View>
+              ) : null}
+            </View>
+
+            <View className="gap-3 rounded-3xl border border-line bg-white p-5">
+              <Text className="text-lg font-bold text-navy">Cargos de tu estancia</Text>
+              {!cuenta || cuenta.cargos.length === 0 ? (
+                <Text className="text-sm text-muted">Todavía no hay cargos registrados.</Text>
+              ) : (
+                cuenta.cargos.map(charge => (
+                  <View key={charge.id} className="gap-1 rounded-2xl border border-line bg-cream p-3.5">
+                    <View className="flex-row items-center justify-between gap-2">
+                      <Text className={`flex-1 text-sm font-semibold text-navy ${charge.estado === 'ANULADO' ? 'line-through' : ''}`}>
+                        {charge.concepto}
+                      </Text>
+                      <Text className={`text-sm font-bold text-navy ${charge.estado === 'ANULADO' ? 'line-through' : ''}`}>
+                        {money(charge.monto)}
+                      </Text>
+                    </View>
+                    <Text className="text-xs text-muted">
+                      {dateLabel(charge.fechaHora)}
+                      {charge.cantidad !== 1 ? ` · ${charge.cantidad} × ${money(charge.precioUnitario)}` : ''}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </View>
+
+            <View className="gap-3 rounded-3xl border border-line bg-white p-5">
+              <Text className="text-lg font-bold text-navy">Pagos registrados</Text>
+              {!cuenta || cuenta.pagos.length === 0 ? (
+                <Text className="text-sm text-muted">Todavía no hay pagos registrados.</Text>
+              ) : (
+                cuenta.pagos.map(payment => (
+                  <View key={payment.id} className="gap-1 rounded-2xl border border-line bg-cream p-3.5">
+                    <View className="flex-row items-center justify-between">
+                      <Text className="text-sm font-semibold text-navy">{metodoPagoLabel[payment.metodo]}</Text>
+                      <Text className="text-sm font-bold text-navy">{money(payment.monto)}</Text>
+                    </View>
+                    <Text className="text-xs text-muted">
+                      {dateLabel(payment.fechaHora)} · {estadoPagoLabel[payment.estado]}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </View>
+
+            {stay.estado === 'EN_ESTADIA' ? (
+              <Action
+                label="Continuar al check-out digital y factura"
+                onPress={() => router.push({ pathname: '/checkout', params: { codigo: stay.codigo } })}
+              />
+            ) : null}
+
+            {cuenta?.facturaId ? (
+              <Action
+                label="Ver mi factura"
+                secondary
+                onPress={() => router.push({ pathname: '/factura', params: { codigo: stay.codigo } })}
+              />
+            ) : null}
+          </View>
+        ) : null}
+
         {/* Pestaña: GESTIONAR ESTANCIA */}
         {stay && seccion === 'reservar' ? (
           <View className="gap-4">
@@ -973,7 +1139,8 @@ export default function StayScreen() {
             </View>
           </View>
         ) : null}
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

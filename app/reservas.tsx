@@ -3,11 +3,20 @@ import { useCallback, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Action, Loading, Notice } from '../components/cuenta';
-import { cerrarSesion, estadoReservaLabel, listarReservas, ReservaResumen } from '../lib/api/huesped';
+import { abrirPasarela } from '../lib/api/checkout';
+import {
+  cerrarSesion,
+  esperarPagoReservaPublica,
+  estadoReservaLabel,
+  iniciarPagoReservaPublica,
+  listarReservas,
+  ReservaResumen,
+} from '../lib/api/huesped';
 
 export default function Reservations() {
   const [reservas, setReservas] = useState<ReservaResumen[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pagandoCodigo, setPagandoCodigo] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const reload = useCallback(async () => {
@@ -18,6 +27,22 @@ export default function Reservations() {
   }, []);
 
   useFocusEffect(useCallback(() => { void reload(); }, [reload]));
+
+  async function pagarReserva(codigo: string) {
+    if (pagandoCodigo) return;
+    setPagandoCodigo(codigo);
+    setError('');
+    try {
+      const sesion = await iniciarPagoReservaPublica(codigo);
+      await abrirPasarela(sesion.urlPago);
+      await esperarPagoReservaPublica(codigo, 8, 2500);
+      await reload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo iniciar el pago con Recurrente.');
+    } finally {
+      setPagandoCodigo(null);
+    }
+  }
 
   return (
     <SafeAreaView edges={['bottom']} className="flex-1 bg-cream">
@@ -58,8 +83,16 @@ export default function Reservations() {
                 <Text className="mt-0.5 text-sm font-semibold text-navy">{reserva.salida}</Text>
               </View>
             </View>
+            {reserva.estado === 'PENDIENTE_PAGO' ? (
+              <Action
+                label={pagandoCodigo === reserva.codigo ? 'Abriendo Recurrente…' : 'Pagar reserva con Recurrente'}
+                disabled={pagandoCodigo !== null}
+                onPress={() => { void pagarReserva(reserva.codigo); }}
+              />
+            ) : null}
             <Action
               label="Abrir mi estancia"
+              secondary={reserva.estado === 'PENDIENTE_PAGO'}
               onPress={() => router.push({ pathname: '/estadia', params: { codigo: reserva.codigo } })}
             />
           </View>

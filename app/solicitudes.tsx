@@ -1,7 +1,7 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { Action, dateLabel, Loading, Notice, useCarga } from '../components/cuenta';
 import { detalleReserva, reservaActual } from '../lib/api/huesped';
 import { cancelarSolicitud, describirSolicitud, estadoSolicitudLabel, listarArticulos, listarSolicitudes, solicitarArticulos, solicitarLimpieza } from '../lib/api/solicitudes';
@@ -27,7 +27,7 @@ export default function Requests() {
     setBusy(true); setError(''); setMessage('');
     try { await action(data.codigo); setMessage(done); } catch (cause) { setError((cause as Error).message); } finally { setBusy(false); await reload(); }
   }
-  return <SafeAreaView edges={['bottom']} className="flex-1 bg-cream"><ScrollView className="flex-1 bg-cream" keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} />}>
+  return <SafeAreaView edges={['bottom']} className="flex-1 bg-cream"><KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}><ScrollView className="flex-1 bg-cream" keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentContainerStyle={{ padding: 24, paddingBottom: 140 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} />}>
     <Text accessibilityRole="header" className="mb-6 text-3xl text-navy">Limpieza y artículos</Text>
     {loadError ? <Notice text={loadError} /> : null}
     {!data && !loadError ? <Loading label="Cargando solicitudes…" /> : null}
@@ -42,5 +42,5 @@ export default function Requests() {
     <Text accessibilityRole="header" className="my-6 text-xl text-navy">Mis solicitudes</Text>
     {data && !data.solicitudes.length ? <Text className="text-muted">Todavía no tienes solicitudes.</Text> : null}
     {data?.solicitudes.map(request => <View key={request.id} className="mb-4 gap-3 rounded-2xl bg-white p-5"><Text className="font-semibold text-navy">{request.tipo === 'LIMPIEZA' ? 'Limpieza' : 'Artículos'} · {estadoSolicitudLabel[request.estado]}</Text><Text className="text-muted">{dateLabel(request.creadaEn)}</Text><Text className="text-navy">{describirSolicitud(request)}</Text>{request.comentario ? <Text className="text-muted">{request.comentario}</Text> : null}{request.estado === 'PENDIENTE' ? <Action label="Cancelar solicitud" secondary disabled={busy} onPress={() => run(codigo => cancelarSolicitud(codigo, request.id).then(() => undefined), 'Solicitud cancelada.')} /> : request.estado === 'EN_PROCESO' ? <Text className="text-xs text-muted">El personal ya está atendiendo esta solicitud; no se puede cancelar.</Text> : null}</View>)}
-  </ScrollView></SafeAreaView>;
+  </ScrollView></KeyboardAvoidingView></SafeAreaView>;
 }

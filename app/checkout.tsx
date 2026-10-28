@@ -45,8 +45,8 @@ export default function CheckoutScreen() {
     await olvidarDispositivo().catch(() => undefined);
     router.replace({ pathname: '/factura', params: { codigo } });
   }, false);
-  return <SafeAreaView edges={['bottom']} className="flex-1 bg-cream"><KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} />}>
+  return <SafeAreaView edges={['bottom']} className="flex-1 bg-cream"><KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}>
+    <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentContainerStyle={{ padding: 24, paddingBottom: 140 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} />}>
       <Text accessibilityRole="header" className="text-3xl text-navy">Antes de despedirnos</Text>
       <Text className="mb-6 mt-3 text-base leading-6 text-muted">Revisa tu saldo y los datos de tu factura. El check-out en la app está disponible el día de salida, de 00:00 a 12:00 (Guatemala).</Text>
       {loadError ? <><Notice text={loadError} /><Action label="Reintentar" onPress={reload} /></> : null}
