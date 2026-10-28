@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { Action, dateLabel, Loading, money, Notice, useCarga } from '../components/cuenta';
+import { abrirPasarela, esperarAcreditacion, iniciarPagoSaldo } from '../lib/api/checkout';
 import { consultarCuenta } from '../lib/api/cuenta';
 import { consultarMenu, crearPedido, estadoPedidoLabel, listarPedidos, totalCarrito } from '../lib/api/pedidos';
 import {
@@ -20,7 +21,9 @@ import {
   consultarWifi,
   detalleReserva,
   enviarMensajeChat,
+  esperarPagoReservaPublica,
   estadoReservaLabel,
+  iniciarPagoReservaPublica,
   listarAmenidades,
   listarDocumentosCheckin,
   listarMensajesChat,
@@ -80,6 +83,10 @@ export default function StayScreen() {
   const [mensajeTexto, setMensajeTexto] = useState('');
   const [enviandoChat, setEnviandoChat] = useState(false);
   const [avisoChat, setAvisoChat] = useState<string | null>(null);
+
+  // Estados para Pago con Recurrente
+  const [pagando, setPagando] = useState(false);
+  const [avisoPago, setAvisoPago] = useState<string | null>(null);
 
   const cargarTodo = useCallback(async () => {
     const cod = await reservaActual(codigo);
@@ -211,6 +218,38 @@ export default function StayScreen() {
     }
   }
 
+  async function handlePagarRecurrente() {
+    if (!stay || pagando) return;
+    setPagando(true);
+    setAvisoPago(null);
+    try {
+      if (stay.estado === 'PENDIENTE_PAGO') {
+        const sesion = await iniciarPagoReservaPublica(stay.codigo);
+        await abrirPasarela(sesion.urlPago);
+        const est = await esperarPagoReservaPublica(stay.codigo, 8, 2500);
+        setAvisoPago(
+          est.estadoReserva === 'CONFIRMADA'
+            ? '¡Pago confirmado! Tu reserva ya está confirmada.'
+            : 'Estamos verificando tu pago con Recurrente. Desliza para actualizar en unos segundos.',
+        );
+      } else if (stay.estado === 'EN_ESTADIA') {
+        const sesion = await iniciarPagoSaldo(stay.codigo);
+        if (sesion?.urlPago) {
+          await abrirPasarela(sesion.urlPago);
+          await esperarAcreditacion(stay.codigo, 8, 2500);
+          setAvisoPago('Pago procesado con Recurrente.');
+        } else {
+          setAvisoPago('Tu saldo actual ya está en Q 0.00.');
+        }
+      }
+      await reload();
+    } catch (e) {
+      setAvisoPago(e instanceof Error ? e.message : 'No se pudo iniciar el pago con Recurrente.');
+    } finally {
+      setPagando(false);
+    }
+  }
+
   const alojTotal = cuenta?.cargos.filter(c => c.tipo === 'ALOJAMIENTO' && c.estado === 'VIGENTE').reduce((acc, c) => acc + c.monto, 0) ?? 0;
   const extrasTotal = cuenta ? Math.max(0, cuenta.totalCargosVigentes - alojTotal) : 0;
   const totalMenu = menu ? totalCarrito(menu, carrito) : 0;
@@ -275,6 +314,27 @@ export default function StayScreen() {
         {/* Pestaña: MI ESTANCIA (inicio) */}
         {stay && seccion === 'inicio' ? (
           <>
+            {avisoPago ? <Notice text={avisoPago} /> : null}
+
+            {stay.estado === 'PENDIENTE_PAGO' ? (
+              <View className="gap-3 rounded-3xl border border-gold bg-sand p-5">
+                <Text className="text-xs font-semibold uppercase tracking-widest text-gold">
+                  Acción requerida · Reserva pendiente de pago
+                </Text>
+                <Text className="text-lg font-semibold text-navy">
+                  Confirma tu reserva con Recurrente
+                </Text>
+                <Text className="text-xs leading-5 text-muted">
+                  Realiza el pago de tu alojamiento en línea para pasar tu reserva a Confirmada. En modo prueba puedes usar la tarjeta 4242 4242 4242 4242.
+                </Text>
+                <Action
+                  label={pagando ? 'Abriendo pasarela Recurrente…' : `Pagar reserva ahora${cuenta ? ` · ${money(cuenta.saldo)}` : ''}`}
+                  disabled={pagando}
+                  onPress={() => { void handlePagarRecurrente(); }}
+                />
+              </View>
+            ) : null}
+
             {!cerrada ? (
               <View className="gap-2 rounded-2xl border border-gold bg-white p-4">
                 <Text className="text-base font-semibold text-navy">Documentos del check-in</Text>
@@ -364,6 +424,13 @@ export default function StayScreen() {
                     <Text className="mt-0.5 text-xs font-semibold text-navy">{money(cuenta.totalPagosAprobados)}</Text>
                   </View>
                 </View>
+              ) : null}
+              {cuenta && cuenta.saldo > 0 && (stay.estado === 'PENDIENTE_PAGO' || stay.estado === 'EN_ESTADIA') ? (
+                <Action
+                  label={pagando ? 'Abriendo Recurrente…' : `Pagar con Recurrente · ${money(cuenta.saldo)}`}
+                  disabled={pagando}
+                  onPress={() => { void handlePagarRecurrente(); }}
+                />
               ) : null}
             </View>
 

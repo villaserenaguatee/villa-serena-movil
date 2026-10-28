@@ -4,11 +4,14 @@ import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, Tex
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { z } from 'zod';
 import { Action, money, Notice } from '../components/cuenta';
+import { abrirPasarela } from '../lib/api/checkout';
 import {
   buscarDisponibilidadPublica,
   crearReservaPublica,
   destinoTrasAcceso,
+  esperarPagoReservaPublica,
   generarBorradorId,
+  iniciarPagoReservaPublica,
   listarReservas,
   OpcionDisponiblePublica,
   solicitarCodigo,
@@ -124,13 +127,23 @@ export default function Access() {
       borradorId,
       verif.comprobante,
     );
+    // Abre Recurrente para pagar la reserva recién creada desde la app
+    try {
+      const sesionPago = await iniciarPagoReservaPublica(creada.codigo);
+      if (sesionPago?.urlPago) {
+        await abrirPasarela(sesionPago.urlPago);
+        await esperarPagoReservaPublica(creada.codigo, 6, 2000).catch(() => null);
+      }
+    } catch {
+      /* Si el usuario cierra la pasarela, igual podrá pagar desde su estancia */
+    }
     // Solicita inmediatamente el código de acceso a la app para entrar directo
     await solicitarCodigo(correoLimpio);
     setEmail(correoLimpio);
     setModo('login');
     setStep('code');
     setCode('');
-    setMessage(`¡Reserva ${creada.codigo} creada! Te enviamos un código de acceso a ${correoLimpio} para entrar a tu estancia.`);
+    setMessage(`¡Reserva ${creada.codigo} registrada! Te enviamos un código de acceso a ${correoLimpio} para entrar a tu estancia.`);
   });
 
   return (

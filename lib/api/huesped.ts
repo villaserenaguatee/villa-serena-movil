@@ -108,9 +108,28 @@ export function enviarMensajeChat(codigo: string, texto: string) {
 export type OpcionDisponiblePublica = Schemas['OpcionDisponiblePublica'];
 export type ReservaWebPeticion = Schemas['ReservaWebPeticion'];
 export type ReservaWebCreada = Schemas['ReservaWebCreada'];
+export type PagoIniciado = Schemas['PagoIniciado'];
+export type EstadoReservaPublico = Schemas['EstadoReservaPublico'];
 
 export function generarBorradorId() {
   return uuidV4();
+}
+
+export function iniciarPagoReservaPublica(codigo: string) {
+  return apiJson<PagoIniciado>(`/api/v1/publico/reservas/${encodeURIComponent(codigo)}/pago`, { method: 'POST' }, false);
+}
+
+export function consultarEstadoReservaPublica(codigo: string) {
+  return apiJson<EstadoReservaPublico>(`/api/v1/publico/reservas/${encodeURIComponent(codigo)}/estado`, {}, false);
+}
+
+export async function esperarPagoReservaPublica(codigo: string, intentos = 10, esperaMs = 2500) {
+  let estado = await consultarEstadoReservaPublica(codigo);
+  for (let i = 1; i < intentos && estado.estadoReserva === 'PENDIENTE_PAGO'; i++) {
+    await new Promise(resolve => setTimeout(resolve, esperaMs));
+    estado = await consultarEstadoReservaPublica(codigo);
+  }
+  return estado;
 }
 
 export function buscarDisponibilidadPublica(entrada: string, salida: string, huespedes: number) {
