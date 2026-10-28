@@ -33,7 +33,8 @@ export function invocation(args = [], env = process.env, root = appRoot) {
 export function verifyCheckout(docs, revision, git = (args, options) => execFileSync('git', ['-C', docs, ...args], options)) {
   const head = git(['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   const dirty = git(['status', '--porcelain', '--untracked-files=all', '--', 'openapi.yaml', 'scripts', 'package.json', 'pnpm-lock.yaml'], { encoding: 'utf8' }).trim();
-  if (head !== revision || dirty) throw new Error('Docs no corresponde al SHA fijado o tiene cambios en contrato/herramientas. No se generaron tipos.');
+  if (head !== revision) throw new Error(`Docs no corresponde al SHA fijado: esperado ${revision}, recibido ${head}. No se generaron tipos.`);
+  if (dirty) throw new Error(`Docs tiene cambios en contrato/herramientas. No se generaron tipos:\n${dirty}`);
   const source = readFileSync(resolve(docs, 'openapi.yaml'));
   const committed = git(['show', `${revision}:openapi.yaml`], {});
   if (!source.equals(committed)) throw new Error('Los bytes del contrato difieren del commit. Usa un checkout limpio con core.autocrlf=false para conservar LF y la huella reproducible.');
