@@ -1,6 +1,49 @@
-# Villa Serena — App del huésped
+# Villa Serena — App del huésped y personal operativo
 
 Base Android de Carlos (OBJ-0F, parte 1). Expo SDK 54, Expo Router, TypeScript y NativeWind. Sigue la paleta azul/dorado/crema de la web. La app habla directamente con Spring; no usa el BFF ni los stores del navegador.
+
+## Personal operativo (Docs #63 / Móvil #23–#26)
+
+La portada ofrece **Soy personal del hotel** para correo laboral y contraseña.
+Room Service entra a pedidos/menú; Mantenimiento y Limpieza se organiza por área:
+LIMPIEZA permite habitaciones y solicitudes, MANTENIMIENTO permite incidencias,
+AMBAS habilita ambos módulos. Cualquier área MYL puede reportar una incidencia.
+ADMIN y RECEPCION siguen usando la web en esta entrega. La contraseña temporal
+debe cambiarse antes de operar; se puede cerrar sesión desde esa pantalla.
+
+La identidad se consulta en `/auth/yo`, los tokens/perfil mínimo quedan en
+SecureStore, y las rutas del huésped y del personal tienen guardas separadas.
+La renovación conserva el contexto del empleado y el cierre borra sesión aun sin
+red. HTTP va directo a Spring; STOMP del personal obtiene un ticket de un uso
+desde `/auth/ws-ticket` y nunca envía el JWT del empleado en CONNECT.
+
+Room Service permite cola/detalle, avance consecutivo, cancelación motivada y
+marcar agotados; solo ADMIN puede reactivarlos desde la web. Limpieza permite
+iniciar/interrumpir/terminar y tomar/atender solicitudes según responsable.
+Mantenimiento permite reportar, consultar, tomar y resolver, con solución
+obligatoria. Una foto JPG/PNG opcional de hasta 5 MiB se toma o selecciona por
+acción del empleado; el servidor la almacena como INCIDENCIA privada.
+
+Ante un reporte incierto, se guarda su UUID/cuerpo en SecureStore, asociado al
+empleado, y se confirma con la misma referencia incluso después de reiniciar.
+No se envían operaciones automáticamente sin conexión. Tras un conflicto se
+recarga el estado; el servidor sigue autorizando cada operación.
+
+No incluye inventario, activos, preventivos, órdenes ampliadas, objetos olvidados
+ni historial general de pedidos. `main` 9dfea50 incorpora el portal del huésped
+y la creación nativa de reservas de las PR #28/#29; esta rama conserva esos
+flujos. Su presencia en código no acredita una prueba de reserva/pago en teléfono.
+La propuesta contractual se revisa en Docs #63 antes de actualizar el pin y los
+tipos. No copiar ni editar manualmente `lib/api/schema.d.ts`.
+
+```sh
+pnpm test:personal
+```
+
+Las pruebas usan servidor/SecureStore/STOMP simulados, sin escrituras al hotel.
+La cámara, navegación y permisos reales requieren comprobación en dispositivo y
+entorno aislado. Al añadir módulos nativos hay que regenerar cualquier APK de
+desarrollo anterior; Expo Go de SDK 54 incluye los módulos usados.
 
 ## Arranque
 

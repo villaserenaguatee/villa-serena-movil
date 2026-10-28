@@ -25,7 +25,7 @@ async function renewSession() {
           body: JSON.stringify({ refreshToken: session.refreshToken }),
         });
         if (!response.ok) throw new ApiError(401, 'SESION_VENCIDA', 'Tu sesión venció. Inicia sesión de nuevo.');
-        await saveSession(tokensSchema.parse(await response.json()));
+        await saveSession({ ...tokensSchema.parse(await response.json()), ...(session.empleado ? { empleado: session.empleado } : {}) });
       } catch (error) { await clearSession(); throw error; }
     })().finally(() => { refreshInFlight = null; });
   }

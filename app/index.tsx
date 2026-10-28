@@ -1,11 +1,11 @@
 import { useSyncExternalStore } from 'react';
-import { isSessionActive, subscribeSession } from '../lib/sesion';
+import { sessionSnapshot, subscribeSession } from '../lib/sesion';
 import { Link } from 'expo-router';
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function Welcome() {
-  const session = useSyncExternalStore(subscribeSession, isSessionActive, () => false);
+  const session = useSyncExternalStore(subscribeSession, sessionSnapshot, () => null);
   return (
     <SafeAreaView className="flex-1 bg-cream">
       <ScrollView className="flex-1 bg-cream" contentContainerStyle={{ flexGrow: 1 }}>
@@ -66,16 +66,22 @@ export default function Welcome() {
 
           {/* Acciones inferiores elegantes */}
           <View className="gap-3 pb-2">
-            <Link href={session ? '/reservas' : '/acceso'} asChild>
+            <Link href={session?.empleado ? session.empleado.debeCambiarContrasena ? '/personal/contrasena' : '/personal' : session ? '/reservas' : '/acceso'} asChild>
               <Pressable
                 accessibilityRole="button"
                 className="rounded-2xl border border-gold bg-gold px-6 py-4 active:opacity-85"
               >
                 <Text className="text-center text-base font-semibold tracking-wide text-white">
-                  {session ? 'Continuar a mi estancia' : 'Entrar con mi correo'}
+                  {session?.empleado ? 'Ir a mi operación' : session ? 'Continuar a mi estancia' : 'Entrar con mi correo'}
                 </Text>
               </Pressable>
             </Link>
+
+            {!session && <Link href="/acceso-personal" asChild>
+              <Pressable accessibilityRole="button" className="rounded-2xl border border-gold bg-sand px-6 py-4 active:opacity-85">
+                <Text className="text-center text-base font-semibold text-navy">Soy personal del hotel</Text>
+              </Pressable>
+            </Link>}
 
             <Link href="/prueba-notificaciones" asChild>
               <Pressable accessibilityRole="button" className="py-2">

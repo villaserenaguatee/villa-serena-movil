@@ -48,7 +48,7 @@ export default function Access() {
   const [telefonoDigits, setTelefonoDigits] = useState('');
   const [tipoDoc, setTipoDoc] = useState<'DPI' | 'PASAPORTE'>('DPI');
   const [numDoc, setNumDoc] = useState('');
-  const [nacionalidad, setNacionalidad] = useState('Guatemalteca');
+  const [nacionalidad] = useState('Guatemalteca');
 
   const [borradorId, setBorradorId] = useState(() => generarBorradorId());
   const [pasoReserva, setPasoReserva] = useState<'datos' | 'verificar' | 'pagar'>('datos');
