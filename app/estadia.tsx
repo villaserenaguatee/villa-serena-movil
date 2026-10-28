@@ -943,9 +943,10 @@ export default function StayScreen() {
             <View className="gap-3 rounded-3xl border border-line bg-white p-5">
               <Text className="text-lg font-bold text-navy">Cambiar o consultar mis reservas</Text>
               <Text className="text-sm text-muted">
-                Revisa todas las reservas asociadas a tu cuenta de huésped.
+                Revisa todas las reservas asociadas a tu cuenta de huésped o crea una nueva reserva desde la app.
               </Text>
               <Action label="Ver todas mis reservas" secondary onPress={() => router.push('/reservas')} />
+              <Action label="Reservar otra habitación desde la app" onPress={() => router.push('/acceso')} />
             </View>
           </View>
         ) : null}
