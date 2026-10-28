@@ -104,3 +104,48 @@ function uuidV4() {
 export function enviarMensajeChat(codigo: string, texto: string) {
   return apiJson<{ id: number }>(rutaReserva(codigo, '/chat'), { method: 'POST', body: { clave: uuidV4(), texto: texto.trim() } });
 }
+
+export type OpcionDisponiblePublica = Schemas['OpcionDisponiblePublica'];
+export type ReservaWebPeticion = Schemas['ReservaWebPeticion'];
+export type ReservaWebCreada = Schemas['ReservaWebCreada'];
+
+export function generarBorradorId() {
+  return uuidV4();
+}
+
+export function buscarDisponibilidadPublica(entrada: string, salida: string, huespedes: number) {
+  const qs = `entrada=${encodeURIComponent(entrada)}&salida=${encodeURIComponent(salida)}&huespedes=${huespedes}`;
+  return apiJson<OpcionDisponiblePublica[]>(`/api/v1/publico/disponibilidad?${qs}`, {}, false);
+}
+
+export function solicitarVerificacionReserva(correo: string, borrador: string, nombre: string) {
+  return apiJson<{ estado: string; mensaje?: string }>(
+    '/api/v1/publico/correo/solicitar',
+    { method: 'POST', body: { correo: correo.trim().toLowerCase(), borrador, nombre: nombre.trim() } },
+    false,
+  );
+}
+
+export function verificarCorreoReserva(correo: string, borrador: string, codigo: string) {
+  return apiJson<{ verificado: boolean; comprobante: string }>(
+    '/api/v1/publico/correo/verificar',
+    { method: 'POST', body: { correo: correo.trim().toLowerCase(), borrador, codigo: codigo.trim() } },
+    false,
+  );
+}
+
+export function crearReservaPublica(peticion: ReservaWebPeticion, borrador: string, comprobante: string) {
+  return apiJson<ReservaWebCreada>(
+    '/api/v1/publico/reservas',
+    {
+      method: 'POST',
+      body: peticion,
+      headers: {
+        'Idempotency-Key': uuidV4(),
+        'X-Booking-Draft': borrador,
+        'X-Booking-Email-Verification': comprobante,
+      },
+    },
+    false,
+  );
+}
