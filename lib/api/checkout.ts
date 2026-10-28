@@ -26,9 +26,17 @@ export function consultarFactura(codigo: string) { return apiJson<Factura>(rutaR
 // URL firmada y temporal; se pide de nuevo cada vez que se abre el PDF.
 export function enlaceFacturaPdf(id: number) { return apiJson<Schemas['DescargaFactura']>(`/api/v1/facturas/${id}/pdf`); }
 
-// La pasarela vuelve a villaserena://checkout; el regreso no acredita el pago, solo cierra el navegador.
+// La pasarela vuelve a villaserena://checkout; si openAuthSessionAsync no está disponible en el entorno, usa openBrowserAsync.
 export async function abrirPasarela(urlPago: string) {
-  await WebBrowser.openAuthSessionAsync(urlPago, Linking.createURL('checkout'));
+  try {
+    await WebBrowser.openAuthSessionAsync(urlPago, Linking.createURL('checkout'));
+  } catch {
+    if (typeof WebBrowser.openBrowserAsync === 'function') {
+      await WebBrowser.openBrowserAsync(urlPago);
+    } else {
+      await Linking.openURL(urlPago);
+    }
+  }
 }
 
 // El webhook o la conciliación del servidor acreditan el pago; se consulta mientras la acción sea ESPERAR.

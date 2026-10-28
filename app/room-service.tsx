@@ -1,8 +1,8 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
-import { Action, money, Notice, useCarga } from '../components/cuenta';
+import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { Action, Loading, money, Notice, useCarga } from '../components/cuenta';
 import { ApiError } from '../lib/api';
 import { detalleReserva, reservaActual } from '../lib/api/huesped';
 import { consultarMenu, crearPedido, totalCarrito } from '../lib/api/pedidos';
@@ -10,8 +10,9 @@ export default function RoomService() {
   const { codigo: param } = useLocalSearchParams<{ codigo?: string }>();
   const { data, refreshing, error: loadError, reload } = useCarga(useCallback(async () => {
     const codigo = await reservaActual(param);
-    const active = (await detalleReserva(codigo)).estado === 'EN_ESTADIA';
-    return { codigo, active, menu: active ? await consultarMenu(codigo) : null };
+    const [reserva, menu] = await Promise.all([detalleReserva(codigo), consultarMenu(codigo).catch(() => null)]);
+    const active = reserva.estado === 'EN_ESTADIA';
+    return { codigo, active, menu };
   }, [param]));
   const [cart, setCart] = useState<Record<number, number>>({});
   const [notes, setNotes] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
@@ -28,9 +29,10 @@ export default function RoomService() {
       if (cause instanceof ApiError && cause.status === 409) await reload();
     } finally { setBusy(false); }
   }
-  return <SafeAreaView edges={['bottom']} className="flex-1 bg-cream"><ScrollView className="flex-1 bg-cream" keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} />}>
+  return <SafeAreaView edges={['bottom']} className="flex-1 bg-cream"><KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}><ScrollView className="flex-1 bg-cream" keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentContainerStyle={{ padding: 24, paddingBottom: 140 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} />}>
     <Text accessibilityRole="header" className="mb-6 text-3xl text-navy">Room Service</Text>
     {loadError ? <Notice text={loadError} /> : null}
+    {!data && !loadError ? <Loading label="Cargando menú…" /> : null}
     {data && !data.active ? <Notice text="Room Service está disponible solo durante la estadía." /> : null}
     {menu ? <>
       {menu.categorias.map(category => <View key={category.id} className="mb-6">
@@ -46,7 +48,7 @@ export default function RoomService() {
       <Text className="mb-4 text-2xl font-semibold text-navy">Total: {money(total)}</Text>
       <Text className="mb-5 text-sm leading-6 text-muted">Se cargará a tu cuenta cuando el pedido sea entregado.</Text>
       {error ? <Notice text={error} /> : null}
-      <Action label={busy ? 'Enviando…' : 'Enviar pedido'} disabled={busy || total === 0} onPress={submit} />
+      <Action label={busy ? 'Enviando…' : 'Enviar pedido'} disabled={busy || total === 0 || !data?.active} onPress={submit} />
     </> : null}
-  </ScrollView></SafeAreaView>;
+  </ScrollView></KeyboardAvoidingView></SafeAreaView>;
 }

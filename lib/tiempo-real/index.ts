@@ -4,6 +4,8 @@ import { Client } from '@stomp/stompjs';
 
 import type { Schemas } from '../api';
 import { readSession } from '../sesion';
+import type { Empleado } from '../sesion';
+import { puedeLimpieza, ticketPersonal } from '../api/personal';
 
 export type EventoPedido = Schemas['EventoEstadoPedidoHuesped'];
 
@@ -38,4 +40,37 @@ export function suscribirPedidos({ recargar, alActualizar, alCambiarConexion }: 
   });
   client.activate();
   return () => { void client.deactivate(); };
+}
+
+export function destinosPersonal(empleado: Empleado) {
+  if (empleado.debeCambiarContrasena) return [];
+  if (empleado.rol === 'ROOM_SERVICE') return ['/topic/pedidos'];
+  return puedeLimpieza(empleado) ? ['/topic/habitaciones', '/topic/solicitudes'] : [];
+}
+// El personal nativo también usa ticket: el API no acepta su JWT en CONNECT.
+export function suscribirPersonal(empleado: Empleado, recargar: () => Promise<unknown>, conexion: (activa: boolean) => void) {
+  const destinos = destinosPersonal(empleado);
+  if (!destinos.length) return () => {};
+  let disposed = false;
+  const client = new Client({
+    brokerURL: urlWebSocket(process.env.EXPO_PUBLIC_API_URL ?? ''),
+    reconnectDelay: 5000, heartbeatIncoming: 10000, heartbeatOutgoing: 10000,
+    forceBinaryWSFrames: true, appendMissingNULLonIncoming: true,
+    beforeConnect: async () => {
+      client.connectHeaders = {};
+      try {
+        const { ticket } = await ticketPersonal();
+        if (!disposed) client.connectHeaders = { ticket };
+      } catch { conexion(false); }
+    },
+    onConnect: () => {
+      destinos.forEach(destino => client.subscribe(destino, () => { void recargar().catch(() => undefined); }));
+      conexion(true);
+      void recargar().catch(() => undefined);
+    },
+    onStompError: () => { conexion(false); void recargar().catch(() => undefined); },
+    onWebSocketClose: () => conexion(false),
+  });
+  client.activate();
+  return () => { disposed = true; void client.deactivate(); };
 }

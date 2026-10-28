@@ -2,7 +2,7 @@ name: Seguridad y calidad
 
 on:
   pull_request:
-    branches: [main, develop]
+    branches: [main]
   push:
     branches: [main]
   schedule:
@@ -18,6 +18,8 @@ jobs:
     name: Dependencias (Trivy)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      TRIVY_INCLUDE_DEV_DEPS: 'true'
     permissions:
       contents: read
       security-events: write
@@ -36,7 +38,7 @@ jobs:
           format: sarif
           output: trivy.sarif
       - name: Publicar resultados
-        if: always() && github.event.pull_request.head.repo.fork != true
+        if: always() && hashFiles('trivy.sarif') != '' && github.event.pull_request.head.repo.fork != true
         uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           sarif_file: trivy.sarif
@@ -57,24 +59,26 @@ jobs:
     name: Análisis estático (SonarQube)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    # Los forks no reciben los secretos del repositorio.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
     steps:
       - name: Comprobar configuración
-        id: config
         run: |
           if [ -z "$SONAR_TOKEN" ]; then
-            echo "::warning::Falta el secreto SONAR_TOKEN; se omite el análisis. Consulta docs/CI.md."
-            echo "habilitado=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "habilitado=true" >> "$GITHUB_OUTPUT"
+            echo "::error::Falta el secreto SONAR_TOKEN. Consulta docs/CI.md."
+            exit 1
           fi
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-        if: steps.config.outputs.habilitado == 'true'
         with:
           # SonarQube necesita el historial para atribuir los cambios nuevos.
           fetch-depth: 0
           persist-credentials: false
       - uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
-        if: steps.config.outputs.habilitado == 'true'
+        with:
+          args: >-
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY || 'villaserenaguatee_villa-serena-movil' }}
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION || 'villaserenaguatee' }}
+            -Dsonar.qualitygate.wait=true

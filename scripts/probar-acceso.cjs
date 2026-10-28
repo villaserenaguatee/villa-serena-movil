@@ -71,4 +71,32 @@ const reservas = [{ codigo: 'VS-AAAAAA', entrada: '2026-11-01', salida: '2026-11
     await assert.rejects(cuenta.consultarCuenta('VS-ZZZZZZ'), /no existe/, 'una reserva ajena muestra el 404 del servidor');
     console.log('OK: la cuenta se consulta con el token del huésped y una reserva ajena no se muestra.');
   }
+  {
+    const { state, load } = setup(async path => {
+      if (path.startsWith('/api/v1/publico/disponibilidad?')) return [200, []];
+      if (path === '/api/v1/publico/correo/solicitar') return [200, { estado: 'ENVIADO' }];
+      if (path === '/api/v1/publico/correo/verificar') return [200, { verificado: true, comprobante: 'comprobante-prueba' }];
+      if (path === '/api/v1/publico/reservas') return [201, { codigo: 'VS-NUEVAA' }];
+      return [404, error('NO_ENCONTRADO', 'No encontrado.')];
+    });
+    state.session = tokens;
+    const huesped = load('lib/api/huesped');
+    const borrador = huesped.generarBorradorId();
+    await huesped.buscarDisponibilidadPublica('2026-11-01', '2026-11-03', 2);
+    await huesped.solicitarVerificacionReserva(' ANA@example.test ', borrador, ' Ana ');
+    const verificacion = await huesped.verificarCorreoReserva(' ANA@example.test ', borrador, ' 123456 ');
+    const body = { tipoHabitacionId: 1, entrada: '2026-11-01', salida: '2026-11-03', numeroHuespedes: 2, huesped: { nombreCompleto: 'Ana', correo: 'ana@example.test' } };
+    assert.equal((await huesped.crearReservaPublica(body, borrador, verificacion.comprobante)).codigo, 'VS-NUEVAA');
+    assert(state.calls.every(c => c.token === null), 'el flujo público no envía la sesión guardada');
+    assert.equal(state.calls[0].path, '/api/v1/publico/disponibilidad?entrada=2026-11-01&salida=2026-11-03&huespedes=2');
+    assert.deepEqual(state.calls[1].body, { correo: 'ana@example.test', borrador, nombre: 'Ana' });
+    assert.deepEqual(state.calls[2].body, { correo: 'ana@example.test', borrador, codigo: '123456' });
+    const crear = state.calls[3];
+    assert.deepEqual(crear.body, body);
+    assert.equal(crear.headers.get('X-Booking-Draft'), borrador);
+    assert.equal(crear.headers.get('X-Booking-Email-Verification'), verificacion.comprobante);
+    assert.match(crear.headers.get('Idempotency-Key'), /^[0-9a-f-]{36}$/);
+    assert.equal(state.session.accessToken, tokens.accessToken);
+    console.log('OK: reserva pública conserva borrador, comprobante y cabeceras de idempotencia sin enviar JWT.');
+  }
 })().catch(cause => { console.error(cause); process.exitCode = 1; });

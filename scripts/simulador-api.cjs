@@ -18,7 +18,7 @@ function setup(routes, fakes = {}) {
   };
   const fetch = async (url, options = {}) => {
     const route = url.replace('http://api.test', '');
-    state.calls.push({ path: route, method: options.method ?? 'GET', token: new Headers(options.headers).get('Authorization'), body: options.body && JSON.parse(options.body) });
+    state.calls.push({ path: route, method: options.method ?? 'GET', token: new Headers(options.headers).get('Authorization'), headers: new Headers(options.headers), body: typeof options.body === 'string' ? JSON.parse(options.body) : options.body });
     const [status, body] = await routes(route, options);
     return new Response(body === undefined ? null : JSON.stringify(body), { status });
   };
@@ -28,9 +28,10 @@ function setup(routes, fakes = {}) {
   function load(file) {
     if (modules[file]) return modules[file];
     const exports = modules[file] = {};
-    const source = ts.transpileModule(fs.readFileSync(`${file}.ts`, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-    const resolve = name => (name.startsWith('.') ? path.posix.join(path.posix.dirname(file), name) : name);
-    vm.runInNewContext(source, { exports, Headers, Response, URL, setTimeout, clearTimeout, console, process: { env: { EXPO_PUBLIC_API_URL: 'http://api.test/' } }, fetch, require: name => load(resolve(name)) });
+    const filename = fs.existsSync(`${file}.ts`) ? `${file}.ts` : `${file}/index.ts`;
+    const source = ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+    const resolve = name => (name.startsWith('.') ? path.posix.join(path.posix.dirname(filename), name) : name);
+    vm.runInNewContext(source, { exports, Headers, Response, FormData: fakes.FormData ?? FormData, URL, setTimeout, clearTimeout, console, process: { env: { EXPO_PUBLIC_API_URL: 'http://api.test/' } }, fetch, require: name => name === 'zod' ? require('zod') : load(resolve(name)) });
     return exports;
   }
   return { state, load };

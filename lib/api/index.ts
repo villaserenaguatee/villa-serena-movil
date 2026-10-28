@@ -25,7 +25,7 @@ async function renewSession() {
           body: JSON.stringify({ refreshToken: session.refreshToken }),
         });
         if (!response.ok) throw new ApiError(401, 'SESION_VENCIDA', 'Tu sesión venció. Inicia sesión de nuevo.');
-        await saveSession(tokensSchema.parse(await response.json()));
+        await saveSession({ ...tokensSchema.parse(await response.json()), ...(session.empleado ? { empleado: session.empleado } : {}) });
       } catch (error) { await clearSession(); throw error; }
     })().finally(() => { refreshInFlight = null; });
   }
@@ -51,8 +51,8 @@ export async function apiRequest(path: string, options: RequestInit = {}, authen
   return response;
 }
 // Envía JSON y devuelve el cuerpo; ante un estado no exitoso lanza ApiError con el mensaje del servidor.
-export async function apiJson<T>(path: string, options: { method?: string; body?: unknown } = {}, authenticated = true): Promise<T> {
-  const headers = new Headers({ Accept: 'application/json' });
+export async function apiJson<T>(path: string, options: { method?: string; body?: unknown; headers?: Record<string, string> } = {}, authenticated = true): Promise<T> {
+  const headers = new Headers({ Accept: 'application/json', ...options.headers });
   if (options.body !== undefined) headers.set('Content-Type', 'application/json');
   let response: Response;
   try {
