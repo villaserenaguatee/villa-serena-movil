@@ -28,11 +28,14 @@ del workflow; desactiva su análisis automático al adoptar el análisis por CI.
 ## Diagnóstico del contrato
 
 `api-contract.json` fija el SHA de Docs; el workflow instala sus herramientas con
-el lockfile de ese checkout. Si `check:api` falla, el diagnóstico distingue un SHA
+el lockfile de ese checkout mediante `corepack pnpm`, que usa su `packageManager`.
+El cambio automático desde el binario de pnpm de la app agregaba `@pnpm/exe`
+al lockfile de Docs incluso con `--frozen-lockfile`; ejecutar su versión mediante
+Corepack evita ese cambio de instalador. El workflow exige un diff vacío del
+lockfile después de instalar. Si `check:api` falla, el diagnóstico distingue un SHA
 distinto de archivos modificados y muestra las rutas afectadas. Investiga la
 causa; no omitas la guarda ni regeneres contra un `main` cambiante para poner el
-check verde. La revisión anterior falló en CI; una instalación limpia local no
-reprodujo el fallo, por lo que la nueva ejecución debe confirmar el resultado.
+check verde. La guarda mantiene la comprobación del SHA y los bytes del contrato.
 
 ## Reglas sugeridas para `main`
 
