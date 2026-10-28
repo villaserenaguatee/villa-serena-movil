@@ -52,7 +52,7 @@ export async function apiRequest(path: string, options: RequestInit = {}, authen
 }
 // Envía JSON y devuelve el cuerpo; ante un estado no exitoso lanza ApiError con el mensaje del servidor.
 export async function apiJson<T>(path: string, options: { method?: string; body?: unknown; headers?: Record<string, string> } = {}, authenticated = true): Promise<T> {
-  const headers = new Headers({ ...options.headers, Accept: 'application/json' });
+  const headers = new Headers({ Accept: 'application/json', ...options.headers });
   if (options.body !== undefined) headers.set('Content-Type', 'application/json');
   let response: Response;
   try {

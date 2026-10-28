@@ -6,9 +6,14 @@
     "scheme": "villaserena",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/villa-serena-logo.png",
     "newArchEnabled": true,
     "android": {
-      "package": "gt.villaserena.app"
+      "package": "gt.villaserena.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/villa-serena-logo.png",
+        "backgroundColor": "#f8f6f0"
+      }
     },
     "plugins": [
       "expo-router",

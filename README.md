@@ -30,8 +30,9 @@ No se envían operaciones automáticamente sin conexión. Tras un conflicto se
 recarga el estado; el servidor sigue autorizando cada operación.
 
 No incluye inventario, activos, preventivos, órdenes ampliadas, objetos olvidados
-ni historial general de pedidos. En `main` 8aef9ee hay consulta de reservas del
-huésped, pero no creación nativa verificada: esa capacidad sigue separada.
+ni historial general de pedidos. `main` 9dfea50 incorpora el portal del huésped
+y la creación nativa de reservas de las PR #28/#29; esta rama conserva esos
+flujos. Su presencia en código no acredita una prueba de reserva/pago en teléfono.
 La propuesta contractual se revisa en Docs #63 antes de actualizar el pin y los
 tipos. No copiar ni editar manualmente `lib/api/schema.d.ts`.
 
