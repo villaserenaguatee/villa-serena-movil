@@ -42,7 +42,9 @@ jobs:
             contract-docs/pnpm-lock.yaml
       - name: Instalar herramientas de docs con su lockfile
         working-directory: contract-docs
-        run: pnpm install --frozen-lockfile
+        run: |
+          pnpm install --frozen-lockfile
+          git diff --exit-code -- pnpm-lock.yaml
       - name: Instalar la app con su lockfile
         working-directory: app
         run: pnpm install --frozen-lockfile
