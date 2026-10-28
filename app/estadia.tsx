@@ -1,7 +1,7 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { Action, dateLabel, Loading, money, Notice, useCarga } from '../components/cuenta';
 import { abrirPasarela, esperarAcreditacion, iniciarPagoSaldo } from '../lib/api/checkout';
 import { consultarCuenta, estadoPagoLabel, metodoPagoLabel } from '../lib/api/cuenta';
@@ -252,58 +252,64 @@ export default function StayScreen() {
 
   return (
     <SafeAreaView edges={['bottom']} className="flex-1 bg-cream">
-      {/* Cabecera estilo Portal del Huésped en beige cálido */}
-      {stay ? (
-        <View className="border-b border-line bg-sand px-5 pb-3.5 pt-3">
-          <View className="flex-row items-center justify-between">
-            <View className="flex-1 pr-2">
-              <Text className="text-[10px] font-semibold uppercase tracking-[2.5px] text-gold">Bienvenida a Villa Serena</Text>
-              <Text className="mt-0.5 text-2xl font-light text-navy">Hola, {primerNombre}</Text>
-            </View>
-            <View className="flex-row gap-2">
-              <Pressable onPress={() => router.push('/reservas')} className="rounded-xl border border-line bg-cream px-3 py-1.5">
-                <Text className="text-xs font-semibold text-navy">Reservas</Text>
-              </Pressable>
-              <Pressable onPress={() => setSeccion('perfil')} className="rounded-xl bg-gold px-3 py-1.5">
-                <Text className="text-xs font-semibold text-white">Perfil</Text>
-              </Pressable>
-            </View>
-          </View>
-          <View className="mt-2 flex-row flex-wrap items-center gap-2">
-            <View className="rounded-full border border-line bg-cream px-2.5 py-0.5">
-              <Text className="text-xs font-semibold text-gold">{estadoReservaLabel[stay.estado]}</Text>
-            </View>
-            <Text className="text-xs text-muted">
-              {stay.codigo} · Hab. {stay.habitacion?.numero ?? 'Por asignar'} · Salida {stay.salida}
-            </Text>
-          </View>
-
-          {/* Barra de pestañas idéntica a Huésped Web */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-3" contentContainerStyle={{ gap: 8 }}>
-            {SECCIONES.map(tab => {
-              const isSelected = seccion === tab.id;
-              return (
-                <Pressable
-                  key={tab.id}
-                  onPress={() => seleccionarTab(tab.id)}
-                  className={`rounded-full border px-3.5 py-1.5 ${isSelected ? 'border-gold bg-gold' : 'border-line bg-cream'}`}
-                >
-                  <Text className={`text-xs font-semibold ${isSelected ? 'text-white' : 'text-navy'}`}>
-                    {tab.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-      ) : null}
-
-      <ScrollView
-        className="flex-1 bg-cream"
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ padding: 20, gap: 16 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} />}
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
       >
+        {/* Cabecera estilo Portal del Huésped en beige cálido */}
+        {stay ? (
+          <View className="border-b border-line bg-sand px-5 pb-3.5 pt-3">
+            <View className="flex-row items-center justify-between">
+              <View className="flex-1 pr-2">
+                <Text className="text-[10px] font-semibold uppercase tracking-[2.5px] text-gold">Bienvenida a Villa Serena</Text>
+                <Text className="mt-0.5 text-2xl font-light text-navy">Hola, {primerNombre}</Text>
+              </View>
+              <View className="flex-row gap-2">
+                <Pressable onPress={() => router.push('/reservas')} className="rounded-xl border border-line bg-cream px-3 py-1.5">
+                  <Text className="text-xs font-semibold text-navy">Reservas</Text>
+                </Pressable>
+                <Pressable onPress={() => setSeccion('perfil')} className="rounded-xl bg-gold px-3 py-1.5">
+                  <Text className="text-xs font-semibold text-white">Perfil</Text>
+                </Pressable>
+              </View>
+            </View>
+            <View className="mt-2 flex-row flex-wrap items-center gap-2">
+              <View className="rounded-full border border-line bg-cream px-2.5 py-0.5">
+                <Text className="text-xs font-semibold text-gold">{estadoReservaLabel[stay.estado]}</Text>
+              </View>
+              <Text className="text-xs text-muted">
+                {stay.codigo} · Hab. {stay.habitacion?.numero ?? 'Por asignar'} · Salida {stay.salida}
+              </Text>
+            </View>
+
+            {/* Barra de pestañas idéntica a Huésped Web */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-3" contentContainerStyle={{ gap: 8 }}>
+              {SECCIONES.map(tab => {
+                const isSelected = seccion === tab.id;
+                return (
+                  <Pressable
+                    key={tab.id}
+                    onPress={() => seleccionarTab(tab.id)}
+                    className={`rounded-full border px-3.5 py-1.5 ${isSelected ? 'border-gold bg-gold' : 'border-line bg-cream'}`}
+                  >
+                    <Text className={`text-xs font-semibold ${isSelected ? 'text-white' : 'text-navy'}`}>
+                      {tab.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ) : null}
+
+        <ScrollView
+          className="flex-1 bg-cream"
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          contentContainerStyle={{ padding: 20, paddingBottom: 140, gap: 16 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} />}
+        >
         {error ? <Notice text={error} /> : null}
         {!stay && !error ? <Loading label="Cargando portal del huésped…" /> : null}
 
@@ -1133,7 +1139,8 @@ export default function StayScreen() {
             </View>
           </View>
         ) : null}
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

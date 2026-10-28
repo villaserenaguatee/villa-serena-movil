@@ -162,8 +162,16 @@ export default function Access() {
 
   return (
     <SafeAreaView edges={['bottom']} className="flex-1 bg-cream">
-      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 22, gap: 16 }}>
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
+      >
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          contentContainerStyle={{ padding: 22, paddingBottom: 140, gap: 16 }}
+        >
           {/* Cabecera en beige cálido */}
           <View className="items-center rounded-[28px] border border-line bg-sand px-6 py-6">
             <View className="rounded-full border border-line bg-cream p-3">
