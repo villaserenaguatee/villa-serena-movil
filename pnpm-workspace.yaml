@@ -3,7 +3,9 @@ allowBuilds:
   unrs-resolver: false
 
 overrides:
+  decode-uri-component: ^0.5.1
   image-size: ^2.0.4
+  node-forge: ^1.4.1
   postcss: ^8.5.28
   undici: ^6.29.1
   zod: ^4.6.6
