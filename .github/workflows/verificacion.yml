@@ -1,0 +1,81 @@
+name: Verificación
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    name: Contrato, tipos, lint y pruebas
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          path: app
+          persist-credentials: false
+      - name: Leer la revisión fijada del contrato
+        id: contract
+        run: |
+          echo "repository=$(jq -r .repository app/api-contract.json)" >> "$GITHUB_OUTPUT"
+          echo "revision=$(jq -r .revision app/api-contract.json)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          repository: ${{ steps.contract.outputs.repository }}
+          ref: ${{ steps.contract.outputs.revision }}
+          path: contract-docs
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          package_json_file: app/package.json
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: |
+            app/pnpm-lock.yaml
+            contract-docs/pnpm-lock.yaml
+      - name: Instalar herramientas de docs con su lockfile
+        working-directory: contract-docs
+        run: |
+          # Corepack ejecuta el pnpm fijado por Docs sin cambiar desde el binario de la app.
+          corepack pnpm install --frozen-lockfile
+          git diff --exit-code -- pnpm-lock.yaml
+      - name: Instalar la app con su lockfile
+        working-directory: app
+        run: pnpm install --frozen-lockfile
+      - name: Tipos generados desde el contrato fijado
+        working-directory: app
+        env:
+          API_CONTRACT_DOCS_DIR: ${{ github.workspace }}/contract-docs
+        run: |
+          node --test scripts/contrato-api.test.mjs
+          pnpm check:api
+      - name: Solo EXPO_PUBLIC_API_URL es pública
+        working-directory: app
+        run: |
+          publicas=$(grep -rhoE 'EXPO_PUBLIC_[A-Z0-9_]+' app components lib .env.example app.config.ts | sort -u)
+          if [ "$publicas" != "EXPO_PUBLIC_API_URL" ]; then
+            echo "::error::Variables EXPO_PUBLIC_* no permitidas (se incluyen en el APK): $publicas"
+            exit 1
+          fi
+      - name: TypeScript
+        working-directory: app
+        run: pnpm check
+      - name: Lint
+        working-directory: app
+        run: pnpm lint
+      - name: Pruebas
+        working-directory: app
+        run: |
+          pnpm test:api
+          pnpm test:acceso
+          pnpm test:cuenta
+          pnpm test:servicios
+          pnpm test:notificaciones
+          pnpm test:personal
