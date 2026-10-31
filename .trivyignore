@@ -1,0 +1,4 @@
+# image-size 2.x introduce cambios incompatibles con el empaquetador de assets de Metro/React Native
+# provocando "TypeError: The list argument must be an instance of SharedArrayBuffer, ArrayBuffer or ArrayBufferView"
+CVE-2025-71329
+CVE-2025-71330
